@@ -172,7 +172,9 @@ def main():
 			cursor.execute(full_sql_string)
 		except pyodbc.DataError:
 			print(f"A value in the sql exceeds the field length allowed in database table: {full_sql_string}")
-
+		else:
+			connection.commit()
+			
 	print("Process completed.")
 
 
