@@ -203,15 +203,6 @@ def main():
 			print(values)
 			sql_statements_list.append(sql_values_statement.format(values=values))
 
-			# Basically, building sql statement and all the values for insertion into the database.
-			# database tasks. I think, given the pandas dataframe use, that all of this can occur outside the for loop
-			# get credentials and establish a database connection
-			# sql statement build but depends on if an Overwrite flag is True or False
-			# True -> 'delete from {table_name}; INSERT INTO {table_name} ('header1', 'header2', ...) VALUES ('value1',
-			# 	'value2', 'value3', .... 'datetime value', etc...)'.format(table_name=)
-			# False -> 'INSERT INTO {table_name} ('header1', 'header2', ...) VALUES ('value1', 'value2'
-			# 	, 'value3', .... 'datetime value', etc...)'.format(table_name=)
-
 	full_sql_string = " ".join(sql_statements_list)
 	# print(full_sql_string)
 	exit()
