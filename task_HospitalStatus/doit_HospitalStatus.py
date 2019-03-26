@@ -111,19 +111,19 @@ def main():
 					else:
 						return "normal"
 
-	def format_data_created_value(date_string: str) -> str:
-		return dateparser.parse(date_string)
-
-	def grab_single_html_element(html, element_id):
-		"""
-		pulled from original design except that original returned contents instead of element
-		:param html:
-		:param element_id:
-		:return:
-		"""
-		soup = BeautifulSoup(markup=html, features="lxml")
-		element = soup.find(id=element_id)
-		return element
+	# def format_data_created_value(date_string: str) -> str:
+	# 	return dateparser.parse(date_string)
+	#
+	# def grab_single_html_element(html, element_id):
+	# 	"""
+	# 	pulled from original design except that original returned contents instead of element
+	# 	:param html:
+	# 	:param element_id:
+	# 	:return:
+	# 	"""
+	# 	soup = BeautifulSoup(markup=html, features="lxml")
+	# 	element = soup.find(id=element_id)
+	# 	return element
 
 	def setup_config(cfg_file):
 		cfg_parser = configparser.ConfigParser()
@@ -169,18 +169,6 @@ def main():
 			print(f"Exception during writing of html file {output_filename_path}. {e}")
 			exit()
 
-		# Need to grab the date and time value
-		# try:
-		# 	created_date_element = grab_single_html_element(html=response.content, element_id=html_id_event_datetime)
-		# except Exception as e:
-		# 	print(f"Exception during extraction of datetime from html page {url_string}. {e}")
-		# 	exit()
-		# else:
-		# 	created_date_list = list(created_date_element.contents)
-		# 	# created_date_string = str(created_date_list[0])
-		# 	created_date_formatted = format_data_created_value(str(created_date_list[0]))
-
-		# Old process comment said 'Transform' and nothing else.
 		# Now using pandas to get html table.
 		html_table_dfs_list = pd.read_html(io=response.text, header=0, attrs={"id": html_id_hospital_table})
 		html_table_df = html_table_dfs_list[0]  # html id's are unique so should only be one item in list
