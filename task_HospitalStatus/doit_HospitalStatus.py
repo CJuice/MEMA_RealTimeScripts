@@ -18,8 +18,10 @@ def main():
 	# from Original_Scripts.cgis_Transforms import transformHospitalData
 	# from Original_Scripts.cgis_Updates import runSQL
 	# from Original_Scripts.cgis_Updates import updateTaskTracking
-	from time import strftime
+	# from time import strftime
 	import configparser
+	from datetime import datetime
+	from dateutil import parser as dateparser
 	import numpy as np
 	import os
 	import pandas as pd
@@ -84,36 +86,33 @@ def main():
 		then the row contents from html table. Redesign subtracts two from old index positions since the two date
 		values are no longer a factor.
 		"""
-		# hospital = html_row_series.get(key="Hospital", default=np.NaN)
-		yellow_alert = html_row_series.get(key="Yellow Alert", default=np.NaN)
-		red_alert = html_row_series.get(key="Red Alert", default=np.NaN)
-		mini_disaster = html_row_series.get(key="Mini Disaster", default=np.NaN)
-		reroute = html_row_series.get(key="ReRoute", default=np.NaN)
-		trauma_bypass = html_row_series.get(key="Trauma ByPass", default=np.NaN)
-		# capacity = html_row_series.get(key="Capacity", default=np.NaN)
-
-		# One of the html pages was different than the other two. It had a Capacity column so needed *rest to handle it.
-		# unpack the html table row data into meaningful variable names
-		# hospital, yellow_alert, red_alert, mini_disaster, reroute, trauma_bypass, *rest = html_row_series
+		yellow_alert_ser_val = html_row_series.get(key="Yellow Alert", default=np.NaN)
+		red_alert_ser_val = html_row_series.get(key="Red Alert", default=np.NaN)
+		mini_disaster_ser_val = html_row_series.get(key="Mini Disaster", default=np.NaN)
+		reroute_ser_val = html_row_series.get(key="ReRoute", default=np.NaN)
+		trauma_bypass_ser_val = html_row_series.get(key="Trauma ByPass", default=np.NaN)
 
 		# check for presence of any non-null, value in order of business importance level, and return result
-		if pd.notnull(red_alert):
+		if pd.notnull(red_alert_ser_val):
 			# Red alerts are top priority
 			return "red"
 		else:
-			if pd.notnull(yellow_alert) or pd.notnull(reroute):
+			if pd.notnull(yellow_alert_ser_val) or pd.notnull(reroute_ser_val):
 				# Yellow or ReRoute take second priority
 				return "yellow"
 			else:
-				if pd.notnull(trauma_bypass):
+				if pd.notnull(trauma_bypass_ser_val):
 					# Trauma ByPass is third
 					return "t_bypass"
 				else:
-					if pd.notnull(mini_disaster):
+					if pd.notnull(mini_disaster_ser_val):
 						# Mini Disaster is fourth
 						return "mini"
 					else:
 						return "normal"
+
+	def format_data_created_value(date_string: str) -> str:
+		return dateparser.parse(date_string)
 
 	def grab_single_html_element(html, element_id):
 		"""
@@ -171,21 +170,21 @@ def main():
 			exit()
 
 		# Need to grab the date and time value
-		try:
-			created_date_element = grab_single_html_element(html=response.content, element_id=html_id_event_datetime)
-		except Exception as e:
-			print(f"Exception during extraction of datetime from html page {url_string}. {e}")
-			exit()
-		else:
-			created_date_list = list(created_date_element.contents)
-			created_date_string = str(created_date_list[0])
+		# try:
+		# 	created_date_element = grab_single_html_element(html=response.content, element_id=html_id_event_datetime)
+		# except Exception as e:
+		# 	print(f"Exception during extraction of datetime from html page {url_string}. {e}")
+		# 	exit()
+		# else:
+		# 	created_date_list = list(created_date_element.contents)
+		# 	# created_date_string = str(created_date_list[0])
+		# 	created_date_formatted = format_data_created_value(str(created_date_list[0]))
 
 		# Old process comment said 'Transform' and nothing else.
 		# Now using pandas to get html table.
 		html_table_dfs_list = pd.read_html(io=response.text, header=0, attrs={"id": html_id_hospital_table})
 		html_table_df = html_table_dfs_list[0]  # html id's are unique so should only be one item in list
 
-		# exit()
 		# This iteration will provide a row index value and the row data as a dictionary.
 		row_generator = html_table_df.iterrows()
 		for row_index, row_series in row_generator:
@@ -199,10 +198,9 @@ def main():
 													   mini_disaster=mini_disaster,
 													   reroute=reroute,
 													   trauma_bypass=trauma_bypass,
-													   created_date_string=created_date_string)
+													   created_date_string=current_date_time)
 			print(values)
 			sql_statements_list.append(sql_values_statement.format(values=values))
-
 	full_sql_string = " ".join(sql_statements_list)
 	# print(full_sql_string)
 	exit()
