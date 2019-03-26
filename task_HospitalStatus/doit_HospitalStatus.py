@@ -24,10 +24,11 @@ def main():
 	hospitals_cfg_section_name = "HOSPITALSTATUS"
 	html_id_hospital_table = "tblHospitals"
 	realtime_hospitalstatus_headers = ("Linkname", "Status", "Yellow", "Red", "Mini", "ReRoute", "t_bypass", "DataGenerated")
-	realtime_hospstat_tbl = "RealTime_HospitalStatus"
-	sql_delete_insert_template = """DELETE FROM {realtime_hospstat_tbl}; INSERT INTO {realtime_hospstat_tbl} ({headers_joined})"""
+	realtime_hospstat_tbl = "[OspreyDB_DEV].[dbo].[RealTime_HospitalStatus]"
+	# realtime_hospstat_tbl = "RealTime_HospitalStatus"
+	sql_delete_insert_template = """DELETE FROM {realtime_hospstat_tbl}; INSERT INTO {realtime_hospstat_tbl} ({headers_joined}) VALUES """
 	sql_statements_list = []
-	sql_values_statement = """VALUES ({values})"""
+	sql_values_statement = """({values})"""
 	sql_values_string_template = """'{hospital}', '{status_level_value}', '{red_alert}','{yellow_alert}', '{mini_disaster}', '{reroute}', '{trauma_bypass}', '{created_date_string}'"""
 
 	# ASSERT STATEMENTS
@@ -106,12 +107,12 @@ def main():
 	urls_csv_list = parser[hospitals_cfg_section_name][config_section_value_of_interest].split(",")
 
 	# need the sql table headers as comma separated string values for use in the DELETE & INSERT statement
-	headers_joined = ",".join([f"'{val}'" for val in realtime_hospitalstatus_headers])
+	headers_joined = ",".join([f"{val}" for val in realtime_hospitalstatus_headers])
 	sql_delete_insert_string = sql_delete_insert_template.format(realtime_hospstat_tbl=realtime_hospstat_tbl,
 																headers_joined=headers_joined)
 
 	# need all the sql statement pieces together in list so can join and use as single execution statement
-	sql_statements_list.append(sql_delete_insert_string)
+	# sql_statements_list.append(sql_delete_insert_string)
 
 	# for each url in the list need to get data, parse data, process data
 	for url_index, url_string in enumerate(urls_csv_list):
@@ -154,8 +155,10 @@ def main():
 													   trauma_bypass=trauma_bypass,
 													   created_date_string=current_date_time)
 			values_string = sql_values_statement.format(values=values)
+			# print(values_string)
 			sql_statements_list.append(values_string)
-	full_sql_string = " ".join(sql_statements_list)
+	full_sql_string = sql_delete_insert_string + ",".join(sql_statements_list)
+	# print(full_sql_string)
 
 	# Database Transactions
 	print("Database operations initiated...")
@@ -165,7 +168,8 @@ def main():
 	full_connection_string = create_database_connection_string(db_name=database_name,
 															   db_user=database_user,
 															   db_password=database_password)
-	print(full_connection_string)
+
+	# exit()
 	with pyodbc.connect(full_connection_string) as connection:
 		cursor = connection.cursor()
 		try:
@@ -174,7 +178,7 @@ def main():
 			print(f"A value in the sql exceeds the field length allowed in database table: {full_sql_string}")
 		else:
 			connection.commit()
-			
+
 	print("Process completed.")
 
 
