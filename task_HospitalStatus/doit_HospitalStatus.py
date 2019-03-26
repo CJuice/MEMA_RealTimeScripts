@@ -23,30 +23,27 @@ def main():
 	import os
 	import pandas as pd
 	import requests
-	import sys
-	import traceback
-	import textwrap
 
 	# VARIABLES
 	_root_file_path = os.path.dirname(__file__)
 	config_file_path = r"doit_config_HospitalStatus.cfg"
 	config_section_name = "HospitalStatus"
 	config_section_value_of_interest = "url"
-	html_id_event_datetime = "lblTime"
-	hospitalStatusInfo = {
-		"details":
-			{"tablename": "RealTime_HospitalStatus"},
-		"mapping": [
-			{"input": "Hospital", "output": "Linkname", "type": "string"},
-			{"input": "Status", "output": "Status", "type": "string"},
-			{"input": "Red_Alert", "output": "Red", "type": "string"},
-			{"input": "Yellow_Alert", "output": "Yellow", "type": "string"},
-			{"input": "Mini_Disaster", "output": "Mini", "type": "string"},
-			{"input": "ReRoute", "output": "ReRoute", "type": "string"},
-			{"input": "Trauma_ByPass", "output": "t_bypass", "type": "string"},
-			{"input": "DataGenerated", "output": "DataGenerated", "type": "datetime %A, %B %d, %Y %I:%M:%S %p"},
-		]
-	}
+	# html_id_event_datetime = "lblTime"
+	# hospitalStatusInfo = {
+	# 	"details":
+	# 		{"tablename": "RealTime_HospitalStatus"},
+	# 	"mapping": [
+	# 		{"input": "Hospital", "output": "Linkname", "type": "string"},
+	# 		{"input": "Status", "output": "Status", "type": "string"},
+	# 		{"input": "Red_Alert", "output": "Red", "type": "string"},
+	# 		{"input": "Yellow_Alert", "output": "Yellow", "type": "string"},
+	# 		{"input": "Mini_Disaster", "output": "Mini", "type": "string"},
+	# 		{"input": "ReRoute", "output": "ReRoute", "type": "string"},
+	# 		{"input": "Trauma_ByPass", "output": "t_bypass", "type": "string"},
+	# 		{"input": "DataGenerated", "output": "DataGenerated", "type": "datetime %A, %B %d, %Y %I:%M:%S %p"},
+	# 	]
+	# }
 	html_id_hospital_table = "tblHospitals"
 	realtime_hospitalstatus_headers = ("Linkname", "Status", "Yellow", "Red", "Mini", "ReRoute", "t_bypass",
 										"DataGenerated")
@@ -187,24 +184,10 @@ def main():
 			values_string = sql_values_statement.format(values=values)
 			sql_statements_list.append(values_string)
 	full_sql_string = " ".join(sql_statements_list)
+
 	exit()
 
-	# basically, create database connection,cursor, etc. and update some lastRun value in RealTime_TaskTracking
-	# updateTaskTracking('HospitalStatus', 'RealTime_HospitalStatus')
-	# TODO: Look at things from the database side. Check all the task tracking tables for activity, and the hospital status table
-
-	# except Exception as e:
-	# 	print(e)
-	# 	exit()
-	# 	#update task tracking to indicate the task ran
-	# 	updateTaskTracking('HospitalStatus', 'RealTime_HospitalStatus')
-	#
-	# 	#print traceback to logfile
-	# 	print("Trigger Exception, traceback info forward to log file.")
-	# 	with open("logs\\errlog_HospitalStatus.txt","w") as erfile:
-	# 		erfile.write("Error in doit_HospitalStatus.py execution: " + strftime("%Y-%m-%d %H:%M:%S") + "\n")
-	# 		traceback.print_exc(file=erfile)
-	# 		sys.exit(1)
+	# TODO: Need to interact with database
 	
 
 if __name__ == "__main__":
