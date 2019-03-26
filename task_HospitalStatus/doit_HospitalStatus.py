@@ -8,45 +8,22 @@ def main():
 
 	# IMPORTS
 	from datetime import datetime
-	# from Original_Scripts.cgis_Configs import getConfig
-	# from Original_Scripts.cgis_Configs import getMappingInfo
-	# from Original_Scripts.cgis_MapToSQL import applyDataMap
-	# from Original_Scripts.cgis_Parsers import parseHTMLTable
-	# from Original_Scripts.cgis_Parsers import parseSingleHTMLElement
-	# from Original_Scripts.cgis_Requests import simpleGetRequest
-	# from Original_Scripts.cgis_Transforms import transformHospitalData
-	# from Original_Scripts.cgis_Updates import runSQL
-	# from Original_Scripts.cgis_Updates import updateTaskTracking
-	# from time import strftime
 	import configparser
 	import numpy as np
 	import os
 	import pandas as pd
+	import pyodbc
 	import requests
 
 	# VARIABLES
 	_root_file_path = os.path.dirname(__file__)
 	config_file_path = r"doit_config_HospitalStatus.cfg"
-	config_section_name = "HospitalStatus"
 	config_section_value_of_interest = "url"
-	# html_id_event_datetime = "lblTime"
-	# hospitalStatusInfo = {
-	# 	"details":
-	# 		{"tablename": "RealTime_HospitalStatus"},
-	# 	"mapping": [
-	# 		{"input": "Hospital", "output": "Linkname", "type": "string"},
-	# 		{"input": "Status", "output": "Status", "type": "string"},
-	# 		{"input": "Red_Alert", "output": "Red", "type": "string"},
-	# 		{"input": "Yellow_Alert", "output": "Yellow", "type": "string"},
-	# 		{"input": "Mini_Disaster", "output": "Mini", "type": "string"},
-	# 		{"input": "ReRoute", "output": "ReRoute", "type": "string"},
-	# 		{"input": "Trauma_ByPass", "output": "t_bypass", "type": "string"},
-	# 		{"input": "DataGenerated", "output": "DataGenerated", "type": "datetime %A, %B %d, %Y %I:%M:%S %p"},
-	# 	]
-	# }
+	database_cfg_section_name = "DATABASE"
+	database_connection_string = "DSN={database_name};UID={database_user};PWD={database_password}"
+	hospitals_cfg_section_name = "HOSPITALSTATUS"
 	html_id_hospital_table = "tblHospitals"
-	realtime_hospitalstatus_headers = ("Linkname", "Status", "Yellow", "Red", "Mini", "ReRoute", "t_bypass",
-										"DataGenerated")
+	realtime_hospitalstatus_headers = ("Linkname", "Status", "Yellow", "Red", "Mini", "ReRoute", "t_bypass", "DataGenerated")
 	realtime_hospstat_tbl = "RealTime_HospitalStatus"
 	sql_delete_insert_template = """DELETE FROM {realtime_hospstat_tbl}; INSERT INTO {realtime_hospstat_tbl} ({headers_joined})"""
 	sql_statements_list = []
@@ -57,16 +34,17 @@ def main():
 	assert os.path.exists(config_file_path)
 
 	# FUNCTIONS
+	def create_database_connection_string(db_name, db_user, db_password):
+		"""
+		Create the connection string for accessing database and assign to internal attribute.
+        :return: none
+        """
+		return database_connection_string.format(database_name=db_name,
+												 database_user=db_user,
+												 database_password=db_password)
+
 	def create_date_time_value():
 		return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-
-	# def determine_capacity_value(html_row_series: pd.Series):
-	# 	"""
-	# 	Was not used in final output in original script but value was detected/handled.
-	# 	:param html_row_series:
-	# 	:return:
-	# 	"""
-	# 	return html_row_series.get(key="Capacity", default=np.NaN)
 
 	def determine_status_level(html_row_series: pd.Series):
 		"""Evaluate presence of data in html table and return string based on business logic tree.
@@ -105,20 +83,6 @@ def main():
 					else:
 						return "normal"
 
-	# def format_data_created_value(date_string: str) -> str:
-	# 	return dateparser.parse(date_string)
-	#
-	# def grab_single_html_element(html, element_id):
-	# 	"""
-	# 	pulled from original design except that original returned contents instead of element
-	# 	:param html:
-	# 	:param element_id:
-	# 	:return:
-	# 	"""
-	# 	soup = BeautifulSoup(markup=html, features="lxml")
-	# 	element = soup.find(id=element_id)
-	# 	return element
-
 	def setup_config(cfg_file):
 		cfg_parser = configparser.ConfigParser()
 		cfg_parser.read(filenames=cfg_file)
@@ -133,20 +97,25 @@ def main():
 
 	# get current datetime stamp
 	current_date_time = str(create_date_time_value())
+	print(f"Process Date & Time: {current_date_time}")
 
 	# need parser to access credentials
 	parser = setup_config(config_file_path)
 
 	# read parser file urls_csv_list, split on commas to get list of three urls
-	urls_csv_list = parser[config_section_name][config_section_value_of_interest].split(",")
+	urls_csv_list = parser[hospitals_cfg_section_name][config_section_value_of_interest].split(",")
 
+	# need the sql table headers as comma separated string values for use in the DELETE & INSERT statement
 	headers_joined = ",".join([f"'{val}'" for val in realtime_hospitalstatus_headers])
 	sql_delete_insert_string = sql_delete_insert_template.format(realtime_hospstat_tbl=realtime_hospstat_tbl,
 																headers_joined=headers_joined)
+
+	# need all the sql statement pieces together in list so can join and use as single execution statement
 	sql_statements_list.append(sql_delete_insert_string)
 
-	# for each url in the list need to get data, parse data, process data, update database
+	# for each url in the list need to get data, parse data, process data
 	for url_index, url_string in enumerate(urls_csv_list):
+		print(f"Making request to {url_string}")
 		output_filename_path = f"{_root_file_path}/data/HospitalStatus_{url_index}.html"
 
 		# Make request to url
@@ -156,21 +125,24 @@ def main():
 			print(f"Exception during request for html page {url_string}. {e}")
 			exit()
 
+		# TODO: Remove this at end, or just turn off
 		# Old process wrote html page contents to file. Do not know how/if files are used. Preserving process.
 		try:
 			write_response_to_html(response_content=response.text, filename=output_filename_path)
 		except Exception as e:
 			print(f"Exception during writing of html file {output_filename_path}. {e}")
 			exit()
+		else:
+			print(f"HTML file written: {output_filename_path}")
 
 		# Now using pandas to get html table.
 		html_table_dfs_list = pd.read_html(io=response.text, header=0, attrs={"id": html_id_hospital_table})
 		html_table_df = html_table_dfs_list[0]  # html id's are unique so should only be one item in list
+		print(html_table_df.info())
 
 		# This iteration will provide a row index value and the row data as a dictionary.
 		row_generator = html_table_df.iterrows()
 		for row_index, row_series in row_generator:
-			# capacity_value = determine_capacity_value(row_series)	# Capacity was detected/handled but not output to db
 			status_level_value = determine_status_level(row_series)
 			hospital, yellow_alert, red_alert, mini_disaster, reroute, trauma_bypass, *rest = row_series
 			values = sql_values_string_template.format(hospital=hospital,
@@ -185,10 +157,24 @@ def main():
 			sql_statements_list.append(values_string)
 	full_sql_string = " ".join(sql_statements_list)
 
-	exit()
+	# Database Transactions
+	print("Database operations initiated...")
+	database_name = parser[database_cfg_section_name]["NAME"]
+	database_password = parser[database_cfg_section_name]["PASSWORD"].format(money_sign="$")
+	database_user = parser[database_cfg_section_name]["USER"]
+	full_connection_string = create_database_connection_string(db_name=database_name,
+															   db_user=database_user,
+															   db_password=database_password)
+	print(full_connection_string)
+	with pyodbc.connect(full_connection_string) as connection:
+		cursor = connection.cursor()
+		try:
+			cursor.execute(full_sql_string)
+		except pyodbc.DataError:
+			print(f"A value in the sql exceeds the field length allowed in database table: {full_sql_string}")
 
-	# TODO: Need to interact with database
-	
+	print("Process completed.")
+
 
 if __name__ == "__main__":
 	main()
