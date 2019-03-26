@@ -52,10 +52,11 @@ def main():
 	realtime_hospitalstatus_headers = ("Linkname", "Status", "Yellow", "Red", "Mini", "ReRoute", "t_bypass",
 									   "DataGenerated")
 	realtime_hospstat_tbl = "RealTime_HospitalStatus"
-	sql_delete_insert_template = textwrap.dedent(
-		"""DELETE FROM {realtime_hospstat_tbl}; INSERT INTO {realtime_hospstat_tbl} ({headers_joined})""")
+	sql_delete_insert_template = """DELETE FROM {realtime_hospstat_tbl}; INSERT INTO {realtime_hospstat_tbl} ({headers_joined})"""
 	sql_statements_list = []
 	sql_values_statement = """VALUES ({values})"""
+	sql_values_string_template = """'{hospital}', '{status_level_value}', '{red_alert}','{yellow_alert}', '{mini_disaster}', '{reroute}', '{trauma_bypass}', '{created_date_string}'"""
+
 	# ASSERT STATEMENTS
 	assert os.path.exists(config_file_path)
 
@@ -63,8 +64,13 @@ def main():
 	def create_date_time_value():
 		return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-	def determine_capacity_value(html_row_series: pd.Series):
-		return html_row_series.get(key="Capacity", default=np.NaN)
+	# def determine_capacity_value(html_row_series: pd.Series):
+	# 	"""
+	# 	Was not used in final output in original script but value was detected/handled.
+	# 	:param html_row_series:
+	# 	:return:
+	# 	"""
+	# 	return html_row_series.get(key="Capacity", default=np.NaN)
 
 	def determine_status_level(html_row_series: pd.Series):
 		"""Evaluate presence of data in html table and return string based on business logic tree.
@@ -180,18 +186,21 @@ def main():
 		html_table_df = html_table_dfs_list[0]  # html id's are unique so should only be one item in list
 
 		# exit()
-		# TODO: build out the needs using new design
 		# This iteration will provide a row index value and the row data as a dictionary.
 		row_generator = html_table_df.iterrows()
 		for row_index, row_series in row_generator:
+			# capacity_value = determine_capacity_value(row_series)	# Capacity was detected/handled but not output to db
 			status_level_value = determine_status_level(row_series)
-			capacity_value = determine_capacity_value(row_series)
 			hospital, yellow_alert, red_alert, mini_disaster, reroute, trauma_bypass, *rest = row_series
-			values = f"'{hospital}', '{status_level_value}', '{red_alert}', '{yellow_alert}', '{mini_disaster}', '{reroute}', '{trauma_bypass}', '{created_date_string}'"
-			# continue
-			# values_string = [f"'{str(val)}'" for val in values_from_series]
-			# values_string.append(f"'{created_date_string}'")
-			# values = ",".join(values_string)
+			values = sql_values_string_template.format(hospital=hospital,
+													   status_level_value=status_level_value,
+													   red_alert=red_alert,
+													   yellow_alert=yellow_alert,
+													   mini_disaster=mini_disaster,
+													   reroute=reroute,
+													   trauma_bypass=trauma_bypass,
+													   created_date_string=created_date_string)
+			print(values)
 			sql_statements_list.append(sql_values_statement.format(values=values))
 
 			# Basically, building sql statement and all the values for insertion into the database.
