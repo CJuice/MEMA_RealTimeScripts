@@ -8,7 +8,6 @@ def main():
 
 	# IMPORTS
 	from datetime import datetime
-	from bs4 import BeautifulSoup
 	# from Original_Scripts.cgis_Configs import getConfig
 	# from Original_Scripts.cgis_Configs import getMappingInfo
 	# from Original_Scripts.cgis_MapToSQL import applyDataMap
@@ -20,8 +19,6 @@ def main():
 	# from Original_Scripts.cgis_Updates import updateTaskTracking
 	# from time import strftime
 	import configparser
-	from datetime import datetime
-	from dateutil import parser as dateparser
 	import numpy as np
 	import os
 	import pandas as pd
@@ -52,7 +49,7 @@ def main():
 	}
 	html_id_hospital_table = "tblHospitals"
 	realtime_hospitalstatus_headers = ("Linkname", "Status", "Yellow", "Red", "Mini", "ReRoute", "t_bypass",
-									   "DataGenerated")
+										"DataGenerated")
 	realtime_hospstat_tbl = "RealTime_HospitalStatus"
 	sql_delete_insert_template = """DELETE FROM {realtime_hospstat_tbl}; INSERT INTO {realtime_hospstat_tbl} ({headers_joined})"""
 	sql_statements_list = []
@@ -148,7 +145,7 @@ def main():
 
 	headers_joined = ",".join([f"'{val}'" for val in realtime_hospitalstatus_headers])
 	sql_delete_insert_string = sql_delete_insert_template.format(realtime_hospstat_tbl=realtime_hospstat_tbl,
-													headers_joined=headers_joined)
+																headers_joined=headers_joined)
 	sql_statements_list.append(sql_delete_insert_string)
 
 	# for each url in the list need to get data, parse data, process data, update database
@@ -187,16 +184,10 @@ def main():
 													   reroute=reroute,
 													   trauma_bypass=trauma_bypass,
 													   created_date_string=current_date_time)
-			print(values)
-			sql_statements_list.append(sql_values_statement.format(values=values))
+			values_string = sql_values_statement.format(values=values)
+			sql_statements_list.append(values_string)
 	full_sql_string = " ".join(sql_statements_list)
-	# print(full_sql_string)
 	exit()
-
-	# The table name for the data is 'RealTime_HospitalStatus'
-	# sql = applyDataMap(data, info["mapping"], info["details"]["tablename"], True)
-	# basically, create a connection, a cursor, execute the sql statements, commit, delete cursor, close connection
-	# runSQL(sql)
 
 	# basically, create database connection,cursor, etc. and update some lastRun value in RealTime_TaskTracking
 	# updateTaskTracking('HospitalStatus', 'RealTime_HospitalStatus')
