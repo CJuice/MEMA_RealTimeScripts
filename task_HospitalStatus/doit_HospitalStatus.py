@@ -2,7 +2,6 @@
 REDESIGN
 
 """
-# TODO: Stopped so very early on in the process. cgis_MapToSQL can't be imported because it imports configs too and blah
 
 
 def main():
@@ -21,6 +20,7 @@ def main():
 	# from Original_Scripts.cgis_Updates import updateTaskTracking
 	from time import strftime
 	import configparser
+	import numpy as np
 	import os
 	import pandas as pd
 	import requests
@@ -62,6 +62,40 @@ def main():
 	# FUNCTIONS
 	def create_date_time_value():
 		return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+	def evaluate_alert_level(html_row_series: pd.Series) -> str:
+		"""Evaluate presence of data in html table and return string based on business logic tree.
+		This is reproduced functionality from interpretation of single line statement from old code
+		OLD: "red" if row[4] is not '' else "yellow" if row[3] is not '' or row[6] is not ''
+				else "t_bypass" if row[7] is not '' else "mini" if row[5] is not '' else "normal"
+		'row' was a record from an html table, with two values appended at the beginning. The old process was
+		basically looking for a value other than null/empty and there is a hierarchy of importance if values
+		are simultaneously present. The old way created a list ('row') that started with created date and current date,
+		then the row contents from html table. Redesign subtracts two from old index positions since the two date
+		values are no longer a factor.
+		"""
+		# One of the html pages was different than the other two. It had a Capacity column so needed *rest to handle it.
+		# unpack the html table row data into meaningful variable names
+		hospital, yellow_alert, red_alert, mini_disaster, reroute, trauma_bypass, *rest = html_row_series
+
+		# check for presence of any non-null, value in order of business importance level, and return result
+		if pd.notnull(red_alert):
+			# Red alerts are top priority
+			return "red"
+		else:
+			if pd.notnull(yellow_alert) or pd.notnull(reroute):
+				# Yellow or ReRoute take second priority
+				return "yellow"
+			else:
+				if pd.notnull(trauma_bypass):
+					# Trauma ByPass is third
+					return "t_bypass"
+				else:
+					if pd.notnull(mini_disaster):
+						# Mini Disaster is fourth
+						return "mini"
+					else:
+						return "normal"
 
 	def grab_single_html_element(html, element_id):
 		"""
@@ -141,6 +175,8 @@ def main():
 		# This iteration will provide a row index value and the row data as a dictionary.
 		row_generator = html_table_df.iterrows()
 		for row_index, row_series in row_generator:
+			print(evaluate_alert_level(row_series))
+			continue
 			values_from_series = row_series.to_dict().values()
 			values_string = [f"'{str(val)}'" for val in values_from_series]
 			values_string.append(f"'{created_date_string}'")
