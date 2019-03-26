@@ -63,9 +63,13 @@ def main():
 	def create_date_time_value():
 		return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-	def evaluate_alert_level(html_row_series: pd.Series) -> str:
+	def determine_capacity_value(html_row_series: pd.Series):
+		return html_row_series.get(key="Capacity", default=np.NaN)
+
+	def determine_status_level(html_row_series: pd.Series):
 		"""Evaluate presence of data in html table and return string based on business logic tree.
-		This is reproduced functionality from interpretation of single line statement from old code
+		This is reproduced functionality from interpretation of single line statement in old code
+		that determined 'Status' dictionary keys corresponding value
 		OLD: "red" if row[4] is not '' else "yellow" if row[3] is not '' or row[6] is not ''
 				else "t_bypass" if row[7] is not '' else "mini" if row[5] is not '' else "normal"
 		'row' was a record from an html table, with two values appended at the beginning. The old process was
@@ -74,9 +78,17 @@ def main():
 		then the row contents from html table. Redesign subtracts two from old index positions since the two date
 		values are no longer a factor.
 		"""
+		# hospital = html_row_series.get(key="Hospital", default=np.NaN)
+		yellow_alert = html_row_series.get(key="Yellow Alert", default=np.NaN)
+		red_alert = html_row_series.get(key="Red Alert", default=np.NaN)
+		mini_disaster = html_row_series.get(key="Mini Disaster", default=np.NaN)
+		reroute = html_row_series.get(key="ReRoute", default=np.NaN)
+		trauma_bypass = html_row_series.get(key="Trauma ByPass", default=np.NaN)
+		# capacity = html_row_series.get(key="Capacity", default=np.NaN)
+
 		# One of the html pages was different than the other two. It had a Capacity column so needed *rest to handle it.
 		# unpack the html table row data into meaningful variable names
-		hospital, yellow_alert, red_alert, mini_disaster, reroute, trauma_bypass, *rest = html_row_series
+		# hospital, yellow_alert, red_alert, mini_disaster, reroute, trauma_bypass, *rest = html_row_series
 
 		# check for presence of any non-null, value in order of business importance level, and return result
 		if pd.notnull(red_alert):
@@ -112,9 +124,6 @@ def main():
 		cfg_parser = configparser.ConfigParser()
 		cfg_parser.read(filenames=cfg_file)
 		return cfg_parser
-
-	# def grab_config_value(cfg_parser, key):
-	# 	pass
 
 	def write_response_to_html(response_content, filename):
 		with open(filename, "w") as handler:
@@ -175,12 +184,14 @@ def main():
 		# This iteration will provide a row index value and the row data as a dictionary.
 		row_generator = html_table_df.iterrows()
 		for row_index, row_series in row_generator:
-			print(evaluate_alert_level(row_series))
-			continue
-			values_from_series = row_series.to_dict().values()
-			values_string = [f"'{str(val)}'" for val in values_from_series]
-			values_string.append(f"'{created_date_string}'")
-			values = ",".join(values_string)
+			status_level_value = determine_status_level(row_series)
+			capacity_value = determine_capacity_value(row_series)
+			hospital, yellow_alert, red_alert, mini_disaster, reroute, trauma_bypass, *rest = row_series
+			values = f"'{hospital}', '{status_level_value}', '{red_alert}', '{yellow_alert}', '{mini_disaster}', '{reroute}', '{trauma_bypass}', '{created_date_string}'"
+			# continue
+			# values_string = [f"'{str(val)}'" for val in values_from_series]
+			# values_string.append(f"'{created_date_string}'")
+			# values = ",".join(values_string)
 			sql_statements_list.append(sql_values_statement.format(values=values))
 
 			# Basically, building sql statement and all the values for insertion into the database.
@@ -193,6 +204,7 @@ def main():
 			# 	, 'value3', .... 'datetime value', etc...)'.format(table_name=)
 
 	full_sql_string = " ".join(sql_statements_list)
+	# print(full_sql_string)
 	exit()
 
 	# The table name for the data is 'RealTime_HospitalStatus'
