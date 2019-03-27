@@ -190,7 +190,7 @@ def main():
     # Database Transactions
     print("Database operations initiated...")
     database_name = parser[database_cfg_section_name]["NAME"]
-    database_password = parser[database_cfg_section_name]["PASSWORD"].format(money_sign="$")
+    database_password = parser[database_cfg_section_name]["PASSWORD"]
     database_user = parser[database_cfg_section_name]["USER"]
     full_connection_string = create_database_connection_string(db_name=database_name,
                                                                db_user=database_user,
