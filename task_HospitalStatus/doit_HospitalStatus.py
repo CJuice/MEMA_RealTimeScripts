@@ -26,12 +26,12 @@ def main():
     # VARIABLES
     _root_file_path = os.path.dirname(__file__)
     config_file_path = r"doit_config_HospitalStatus.cfg"
-    database_cfg_section_name = "DATABASE"
+    database_cfg_section_name = "DATABASE_DEV"
     database_connection_string = "DSN={database_name};UID={database_user};PWD={database_password}"
     html_id_hospital_table = "tblHospitals"
     realtime_hospitalstatus_headers = (
     "Linkname", "Status", "Yellow", "Red", "Mini", "ReRoute", "t_bypass", "DataGenerated")
-    realtime_hospstat_tbl = "[OspreyDB_DEV].[dbo].[RealTime_HospitalStatus]"
+    realtime_hospstat_tbl = "[{database_name}].[dbo].[RealTime_HospitalStatus]"
     sql_delete_insert_template = """DELETE FROM {realtime_hospstat_tbl}; INSERT INTO {realtime_hospstat_tbl} ({headers_joined}) VALUES """
     sql_statements_list = []
     sql_values_statement = """({values})"""
@@ -139,11 +139,6 @@ def main():
     # need parser to access credentials
     parser = setup_config(config_file_path)
 
-    # need the sql table headers as comma separated string values for use in the DELETE & INSERT statement
-    headers_joined = ",".join([f"{val}" for val in realtime_hospitalstatus_headers])
-    sql_delete_insert_string = sql_delete_insert_template.format(realtime_hospstat_tbl=realtime_hospstat_tbl,
-                                                                 headers_joined=headers_joined)
-
     # need to get data, parse data, process data for each url in the list
     for url_index, url_string in enumerate(urls_list):
         print(f"Making request to {url_string}")
@@ -185,7 +180,6 @@ def main():
                                                        created_date_string=current_date_time)
             values_string = sql_values_statement.format(values=values)
             sql_statements_list.append(values_string)
-    full_sql_string = sql_delete_insert_string + ",".join(sql_statements_list)
 
     # Database Transactions
     print("Database operations initiated...")
@@ -195,6 +189,14 @@ def main():
     full_connection_string = create_database_connection_string(db_name=database_name,
                                                                db_user=database_user,
                                                                db_password=database_password)
+
+    # need the sql table headers as comma separated string values for use in the DELETE & INSERT statement
+    headers_joined = ",".join([f"{val}" for val in realtime_hospitalstatus_headers])
+    sql_delete_insert_string = sql_delete_insert_template.format(realtime_hospstat_tbl=realtime_hospstat_tbl.format(),
+                                                                 headers_joined=headers_joined)
+
+    # Build the entire SQL statement to be executed
+    full_sql_string = sql_delete_insert_string + ",".join(sql_statements_list)
 
     with pyodbc.connect(full_connection_string) as connection:
         cursor = connection.cursor()
