@@ -192,8 +192,9 @@ def main():
 
     # need the sql table headers as comma separated string values for use in the DELETE & INSERT statement
     headers_joined = ",".join([f"{val}" for val in realtime_hospitalstatus_headers])
-    sql_delete_insert_string = sql_delete_insert_template.format(realtime_hospstat_tbl=realtime_hospstat_tbl.format(),
-                                                                 headers_joined=headers_joined)
+    sql_delete_insert_string = sql_delete_insert_template.format(
+        realtime_hospstat_tbl=realtime_hospstat_tbl.format(database_name=database_name),
+        headers_joined=headers_joined)
 
     # Build the entire SQL statement to be executed
     full_sql_string = sql_delete_insert_string + ",".join(sql_statements_list)
