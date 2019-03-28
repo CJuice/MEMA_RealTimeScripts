@@ -1,7 +1,8 @@
 """
+TODO: Document
 
 """
-
+# FIXME: Cannot figure out why process writing to database doesn't stick. I can query it and write to it but data doesn't change in db table
 
 def main():
 
@@ -16,33 +17,19 @@ def main():
     # VARIABLES
     _root_file_path = os.path.dirname(__file__)
     config_file_path = r"doit_config_NOAAObservedRiverGauge.cfg"
-    noaa_url = r"https://idpgis.ncep.noaa.gov/arcgis/rest/services/NWS_Observations/ahps_riv_gauges/MapServer/0/query?"
+    database_cfg_section_name = "DATABASE_DEV"
+    database_connection_string = "DSN={database_name};UID={database_user};PWD={database_password}"
     noaa_query_payload = {"where": "state = 'MD'",
                           "outFields": "gaugelid,state,location,observed,obstime,status,flood,moderate,major",
                           "returnGeometry": "true",
                           "f": "pjson"}
-    # NOAAObservedRiverGaugesInfo = {
-    #     "details":
-    #         {"tablename": "RealTime_NOAAObservedRiverGauges"},
-    #     "mapping": [
-    #         {"input": "location", "output": "Location", "type": "string"},
-    #         {"input": "status", "output": "Status", "type": "string"},
-    #         {"input": "x", "output": "X", "type": "float"},
-    #         {"input": "y", "output": "Y", "type": "float"},
-    #         {"input": "gaugelid", "output": "gaugeid", "type": "string"},
-    #         {"input": "DataGenerated", "output": "DataGenerated", "type": "datetime %Y-%m-%d %H:%M:%S"}
-    #
-    #     ]
-    # }
+    noaa_url = r"https://idpgis.ncep.noaa.gov/arcgis/rest/services/NWS_Observations/ahps_riv_gauges/MapServer/0/query?"
     realtime_noaaobservedrivergauge_headers = ("GaugeID", "Location", "Status", "X", "Y", "DataGenerated")
     realtime_noaaobservedrivergauge_tbl = "[{database_name}].[dbo].[RealTime_NOAAObservedRiverGauges]"
     sql_delete_insert_template = """DELETE FROM {realtime_noaaobservedrivergauge_tbl}; INSERT INTO {realtime_noaaobservedrivergauge_tbl} ({headers_joined}) VALUES """
     sql_statements_list = []
     sql_values_statement = """({values})"""
-    sql_values_string_template = """'{gaugelid}', '{location}', '{status}', '{longitude}', '{latitude}', '{data_gen}'"""
-    database_cfg_section_name = "DATABASE_DEV"
-    database_connection_string = "DSN={database_name};UID={database_user};PWD={database_password}"
-
+    sql_values_string_template = """'{gaugelid}', '{location}', '{status}', {longitude}, {latitude}, '{data_gen}'"""
 
     # ASSERTS
     assert os.path.exists(config_file_path)
@@ -85,7 +72,7 @@ def main():
         return cfg_parser
 
     # FUNCTIONALITY
-    # need a current datetime stamp for database entry
+    # need a current datetime stamp for process printout
     current_date_time = str(create_date_time_value())
     print(f"Process Date & Time: {current_date_time}")
 
@@ -101,7 +88,6 @@ def main():
     else:
         print(f"Response status code: {response.status_code}")
         response_json = response.json()
-        # pprint(response_json)
 
     gauge_objects_list = []
     features = response_json["features"]
@@ -146,6 +132,18 @@ def main():
     # Build the entire SQL statement to be executed
     full_sql_string = sql_delete_insert_string + ",".join(sql_statements_list)
 
+    # TESTING
+    with pyodbc.connect(full_connection_string) as connection:
+        cursor = connection.cursor()
+        try:
+            cursor.execute("SELECT * FROM [OspreyDB_DEV].[dbo].[RealTime_NOAAObservedRiverGauges]")
+            rows = cursor.fetchall()
+        except:
+            print("mistake")
+        else:
+            for row in rows:
+                print(row)
+
     with pyodbc.connect(full_connection_string) as connection:
         cursor = connection.cursor()
         try:
@@ -155,6 +153,18 @@ def main():
         else:
             connection.commit()
             print(f"Row Count: {cursor.rowcount}")
+
+    # TESTING
+    with pyodbc.connect(full_connection_string) as connection:
+        cursor = connection.cursor()
+        try:
+            cursor.execute("SELECT * FROM [OspreyDB_DEV].[dbo].[RealTime_NOAAObservedRiverGauges]")
+            rows = cursor.fetchall()
+        except:
+            print("mistake")
+        else:
+            for row in rows:
+                print(row)
 
     print("Process completed.")
 
