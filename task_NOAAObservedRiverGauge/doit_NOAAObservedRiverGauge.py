@@ -39,6 +39,29 @@ def main():
                           "outFields": "gaugelid,state,location,observed,obstime,status,flood,moderate,major",
                           "returnGeometry": "true",
                           "f": "pjson"}
+    NOAAObservedRiverGaugesInfo = {
+        "details":
+            {"tablename": "RealTime_NOAAObservedRiverGauges"},
+        "mapping": [
+            {"input": "location", "output": "Location", "type": "string"},
+            {"input": "status", "output": "Status", "type": "string"},
+            {"input": "x", "output": "X", "type": "float"},
+            {"input": "y", "output": "Y", "type": "float"},
+            {"input": "gaugelid", "output": "gaugeid", "type": "string"},
+            {"input": "DataGenerated", "output": "DataGenerated", "type": "datetime %Y-%m-%d %H:%M:%S"}
+
+        ]
+    }
+    realtime_noaaobservedrivergauge_headers = ("GaugeID", "Location", "Status", "X", "Y", "DataGenerated")
+    realtime_noaaobservedrivergauge_tbl = "[{database_name}].[dbo].[RealTime_NOAAObservedRiverGauges]"
+    sql_delete_insert_template = """DELETE FROM {realtime_noaaobservedrivergauge_tbl}; INSERT INTO {realtime_noaaobservedrivergauge_tbl} ({headers_joined}) VALUES """
+    sql_statements_list = []
+    sql_values_statement = """({values})"""
+    sql_values_string_template = """'{location}', '{status}', '{gaugelid}','{longitude}', '{latitude}', '{data_gen}'"""
+    database_cfg_section_name = "DATABASE_DEV"
+    database_connection_string = "DSN={database_name};UID={database_user};PWD={database_password}"
+
+
     # ASSERTS
     assert os.path.exists(config_file_path)
 
@@ -48,11 +71,19 @@ def main():
         location: str
         status: str
         gaugelid: str
-        x: str
-        y: str
+        latitude: str
+        longitude: str
         data_gen: str
 
     # FUNCTIONS
+    def create_database_connection_string(db_name: str, db_user: str, db_password: str) -> str:
+        """
+        Create the connection string for accessing database and return.
+        :return: string, sql connection
+        """
+        return database_connection_string.format(database_name=db_name,
+                                                 database_user=db_user,
+                                                 database_password=db_password)
 
     def create_date_time_value() -> str:
         """
@@ -104,10 +135,45 @@ def main():
                                         attributes.get("obstime", None)
                                         )
                                   )
-    for obj in gauge_objects_list:
-        print(obj)
 
-    return
+    for gauge_obj in gauge_objects_list:
+        values = sql_values_string_template.format(location=gauge_obj.location,
+                                                   status=gauge_obj.status,
+                                                   gaugelid=gauge_obj.gaugelid,
+                                                   latitude=gauge_obj.latitude,
+                                                   longitude=gauge_obj.longitude,
+                                                   data_gen=gauge_obj.data_gen)
+        values_string = sql_values_statement.format(values=values)
+        sql_statements_list.append(values_string)
+
+    # Database Transactions
+    print("Database operations initiated...")
+    database_name = parser[database_cfg_section_name]["NAME"]
+    database_password = parser[database_cfg_section_name]["PASSWORD"]
+    database_user = parser[database_cfg_section_name]["USER"]
+    full_connection_string = create_database_connection_string(db_name=database_name,
+                                                               db_user=database_user,
+                                                               db_password=database_password)
+
+    # need the sql table headers as comma separated string values for use in the DELETE & INSERT statement
+    headers_joined = ",".join([f"{val}" for val in realtime_noaaobservedrivergauge_headers])
+    sql_delete_insert_string = sql_delete_insert_template.format(
+        realtime_noaaobservedrivergauge_tbl=realtime_noaaobservedrivergauge_tbl.format(database_name=database_name),
+        headers_joined=headers_joined)
+
+    # Build the entire SQL statement to be executed
+    full_sql_string = sql_delete_insert_string + ",".join(sql_statements_list)
+
+    with pyodbc.connect(full_connection_string) as connection:
+        cursor = connection.cursor()
+        try:
+            cursor.execute(full_sql_string)
+        except pyodbc.DataError:
+            print(f"A value in the sql exceeds the field length allowed in database table: {full_sql_string}")
+        else:
+            connection.commit()
+
+    print("Process completed.")
 
 
 if __name__ == "__main__":
