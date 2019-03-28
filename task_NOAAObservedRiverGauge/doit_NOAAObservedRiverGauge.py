@@ -6,58 +6,40 @@
 def main():
 
     # IMPORTS
-    # from pprint import pprint
-    # from Original_Scripts.cgis_Configs import getConfig
-    # from Original_Scripts.cgis_Configs import getDBConnection
-    # from Original_Scripts.cgis_Requests import simpleGetRequest
-    # from Original_Scripts.cgis_Parsers import parseJsonResponse
-    # from Original_Scripts.cgis_Transforms import transformNOAAObservedRiverGauges
-    # from Original_Scripts.cgis_Updates import updateTaskTracking
-    # from Original_Scripts.cgis_Configs import getMappingInfo
-    # from Original_Scripts.cgis_MapToSQL import applyDataMap
-    # from Original_Scripts.cgis_Updates import runSQL
-    # from time import strftime
-    # import sys
-    # import traceback
-
+    from dataclasses import dataclass
     from datetime import datetime
     import configparser
-    from dataclasses import dataclass
-    import numpy as np
     import os
-    import pandas as pd
-    from pprint import pprint
     import pyodbc
     import requests
 
     # VARIABLES
     _root_file_path = os.path.dirname(__file__)
     config_file_path = r"doit_config_NOAAObservedRiverGauge.cfg"
-    # noaa_url = r"https://idpgis.ncep.noaa.gov/arcgis/rest/services/NWS_Observations/ahps_riv_gauges/MapServer/0/query?where=state%3D%27MD%27&outFields=state%2Clocation%2Cwfo%2CObserved%2Cstatus%2Cflood%2Cmoderate%2Cmajor&returnGeometry=true&f=pjson"
     noaa_url = r"https://idpgis.ncep.noaa.gov/arcgis/rest/services/NWS_Observations/ahps_riv_gauges/MapServer/0/query?"
     noaa_query_payload = {"where": "state = 'MD'",
                           "outFields": "gaugelid,state,location,observed,obstime,status,flood,moderate,major",
                           "returnGeometry": "true",
                           "f": "pjson"}
-    NOAAObservedRiverGaugesInfo = {
-        "details":
-            {"tablename": "RealTime_NOAAObservedRiverGauges"},
-        "mapping": [
-            {"input": "location", "output": "Location", "type": "string"},
-            {"input": "status", "output": "Status", "type": "string"},
-            {"input": "x", "output": "X", "type": "float"},
-            {"input": "y", "output": "Y", "type": "float"},
-            {"input": "gaugelid", "output": "gaugeid", "type": "string"},
-            {"input": "DataGenerated", "output": "DataGenerated", "type": "datetime %Y-%m-%d %H:%M:%S"}
-
-        ]
-    }
+    # NOAAObservedRiverGaugesInfo = {
+    #     "details":
+    #         {"tablename": "RealTime_NOAAObservedRiverGauges"},
+    #     "mapping": [
+    #         {"input": "location", "output": "Location", "type": "string"},
+    #         {"input": "status", "output": "Status", "type": "string"},
+    #         {"input": "x", "output": "X", "type": "float"},
+    #         {"input": "y", "output": "Y", "type": "float"},
+    #         {"input": "gaugelid", "output": "gaugeid", "type": "string"},
+    #         {"input": "DataGenerated", "output": "DataGenerated", "type": "datetime %Y-%m-%d %H:%M:%S"}
+    #
+    #     ]
+    # }
     realtime_noaaobservedrivergauge_headers = ("GaugeID", "Location", "Status", "X", "Y", "DataGenerated")
     realtime_noaaobservedrivergauge_tbl = "[{database_name}].[dbo].[RealTime_NOAAObservedRiverGauges]"
     sql_delete_insert_template = """DELETE FROM {realtime_noaaobservedrivergauge_tbl}; INSERT INTO {realtime_noaaobservedrivergauge_tbl} ({headers_joined}) VALUES """
     sql_statements_list = []
     sql_values_statement = """({values})"""
-    sql_values_string_template = """'{location}', '{status}', '{gaugelid}','{longitude}', '{latitude}', '{data_gen}'"""
+    sql_values_string_template = """'{gaugelid}', '{location}', '{status}', '{longitude}', '{latitude}', '{data_gen}'"""
     database_cfg_section_name = "DATABASE_DEV"
     database_connection_string = "DSN={database_name};UID={database_user};PWD={database_password}"
 
@@ -67,12 +49,12 @@ def main():
 
     # CLASSES
     @dataclass
-    class Guage:
+    class Gauge:
         location: str
         status: str
         gaugelid: str
-        latitude: str
-        longitude: str
+        latitude: float
+        longitude: float
         data_gen: str
 
     # FUNCTIONS
@@ -127,11 +109,11 @@ def main():
         attributes = feature.get("attributes", {})
         geometry = feature.get("geometry", {})
 
-        gauge_objects_list.append(Guage(attributes.get("location", None),
+        gauge_objects_list.append(Gauge(attributes.get("location", None),
                                         attributes.get("status", None),
                                         attributes.get("gaugelid", None),
-                                        geometry.get("x", None),
-                                        geometry.get("y", None),
+                                        float(geometry.get("x", None)),
+                                        float(geometry.get("y", None)),
                                         attributes.get("obstime", None)
                                         )
                                   )
@@ -172,6 +154,7 @@ def main():
             print(f"A value in the sql exceeds the field length allowed in database table: {full_sql_string}")
         else:
             connection.commit()
+            print(f"Row Count: {cursor.rowcount}")
 
     print("Process completed.")
 
