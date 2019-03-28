@@ -142,7 +142,7 @@ def main():
     # need to get data, parse data, process data for each url in the list
     for url_index, url_string in enumerate(urls_list):
         print(f"Making request to {url_string}")
-        output_filename_path = f"{_root_file_path}/data/HospitalStatus_{url_index}.html"
+        # output_filename_path = f"{_root_file_path}/data/HospitalStatus_{url_index}.html"
 
         # Make request to url
         try:
@@ -150,6 +150,8 @@ def main():
         except Exception as e:
             print(f"Exception during request for html page {url_string}. {e}")
             exit()
+        else:
+            print(f"Response status code: {response.status_code}")
 
         # Old process wrote html page contents to file. Do not know how/if files are used. Preserving process.
         # try:
@@ -161,9 +163,26 @@ def main():
         # 	print(f"HTML file written: {output_filename_path}")
 
         # Need the html table in a readable format for use. Pandas dataframe is cheap and easy.
-        html_table_dfs_list = pd.read_html(io=response.text, header=0, attrs={"id": html_id_hospital_table})
-        html_table_df = html_table_dfs_list[0]  # html id's are unique so should only be one item in list
-        # print(html_table_df.info())
+        try:
+            html_table_dfs_list = pd.read_html(io=response.text, header=0, attrs={"id": html_id_hospital_table})
+        except ValueError as ve:
+            print(ve)
+            print(f"Value Error: No tables found in html page. Expected one table with id = {html_id_hospital_table}")
+            print(f"WebPage where issue was encountered: {url_string}, Response status code: {response.status_code}")
+            print(f"Response text: {response.text}")
+            exit(code=1)
+
+        # Need to get the hospitals table by the html id for the table. HTML id's are unique so should be one table.
+        try:
+            html_table_df = html_table_dfs_list[0]  # html id's are unique so should only be one item in list
+        except IndexError as ie:
+            print(ie)
+            print(f"Index Error: length of html_table_dfs_list is {len(html_table_dfs_list)}; Expected length = 1.")
+            print(f"WebPage where issue was encountered: {url_string}, Response status code: {response.status_code}")
+            print(f"Response text: {response.text}")
+            exit(code=1)
+        else:
+            print(html_table_df.info())
 
         # Need an iteration to provide rows from the dataframe.
         row_generator = html_table_df.iterrows()
@@ -180,7 +199,7 @@ def main():
                                                        created_date_string=current_date_time)
             values_string = sql_values_statement.format(values=values)
             sql_statements_list.append(values_string)
-
+    
     # Database Transactions
     print("Database operations initiated...")
     database_name = parser[database_cfg_section_name]["NAME"]
