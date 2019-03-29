@@ -13,6 +13,7 @@ def main():
     import os
     import pyodbc
     import requests
+    from dateutil import parser as date_parser
 
     # VARIABLES
     _root_file_path = os.path.dirname(__file__)
@@ -61,6 +62,19 @@ def main():
         """
         return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
+    def datetime_quality_control(gauge_obj_date: str) -> str:
+        """
+        Check the data generated value for the occasional N/A or any other unparsable value and set to new value
+        :param gauge_obj_date: value from NOAA query results
+        :return: string
+        """
+        try:
+            converted = date_parser.parse(gauge_obj_date)
+        except:
+            print(f"Before: {gauge_obj_date}")
+            converted = "1970-01-01 00:00:00"
+        return str(converted)
+
     def setup_config(cfg_file: str) -> configparser.ConfigParser:
         """
         Instantiate the parser for accessing a config file.
@@ -105,6 +119,7 @@ def main():
                                   )
 
     for gauge_obj in gauge_objects_list:
+        gauge_obj.data_gen = datetime_quality_control(gauge_obj.data_gen)
         values = sql_values_string_template.format(location=gauge_obj.location,
                                                    status=gauge_obj.status,
                                                    gaugelid=gauge_obj.gaugelid,
@@ -132,18 +147,6 @@ def main():
     # Build the entire SQL statement to be executed
     full_sql_string = sql_delete_insert_string + ",".join(sql_statements_list)
 
-    # TESTING
-    with pyodbc.connect(full_connection_string) as connection:
-        cursor = connection.cursor()
-        try:
-            cursor.execute("SELECT * FROM [OspreyDB_DEV].[dbo].[RealTime_NOAAObservedRiverGauges]")
-            rows = cursor.fetchall()
-        except:
-            print("mistake")
-        else:
-            for row in rows:
-                print(row)
-
     with pyodbc.connect(full_connection_string) as connection:
         cursor = connection.cursor()
         try:
@@ -153,18 +156,6 @@ def main():
         else:
             connection.commit()
             print(f"Row Count: {cursor.rowcount}")
-
-    # TESTING
-    with pyodbc.connect(full_connection_string) as connection:
-        cursor = connection.cursor()
-        try:
-            cursor.execute("SELECT * FROM [OspreyDB_DEV].[dbo].[RealTime_NOAAObservedRiverGauges]")
-            rows = cursor.fetchall()
-        except:
-            print("mistake")
-        else:
-            for row in rows:
-                print(row)
 
     print("Process completed.")
 
