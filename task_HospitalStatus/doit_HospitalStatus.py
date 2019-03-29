@@ -22,6 +22,7 @@ def main():
     import pandas as pd
     import pyodbc
     import requests
+    import time
 
     # VARIABLES
     _root_file_path = os.path.dirname(__file__)
@@ -124,39 +125,70 @@ def main():
 
     # need to get data, parse data, process data for each url in the list
     for url_index, url_string in enumerate(urls_list):
-        print(f"Making request to {url_string}")
-        # output_filename_path = f"{_root_file_path}/data/HospitalStatus_{url_index}.html"
 
-        # Make request to url
-        try:
-            response = requests.get(url=url_string, params={})
-        except Exception as e:
-            print(f"Exception during request for html page {url_string}. {e}")
-            exit()
-        else:
-            print(f"Response status code: {response.status_code}")
+        # Due to known issues with html table presence and content, coding three potential attempts.
+        round_count = 0
+        problem_encountered = False
+        while round_count < 4:
+            round_count += 1
+            print(f"HTML Table Issue Handling - Attempt Count: {round_count}")
 
-        # Need the html table in a readable format for use. Pandas dataframe is cheap and easy.
-        try:
-            html_table_dfs_list = pd.read_html(io=response.text, header=0, attrs={"id": html_id_hospital_table})
-        except ValueError as ve:
-            print(ve)
-            print(f"Value Error: No tables found in html page. Expected one table with id = {html_id_hospital_table}")
-            print(f"WebPage where issue was encountered: {url_string}, Response status code: {response.status_code}")
-            # print(f"Response text: {response.text}")
+            # Setup blank variables, in case of multiple tries
+            response = None
+            html_table_dfs_list = None
+            html_table_df = None
+
+            # Make request to url
+            print(f"\nMaking request to {url_string}")
+            try:
+                response = requests.get(url=url_string, params={})
+            except Exception as e:
+                print(f"Exception during request for html page {url_string}. {e}")
+                exit(code=1)
+            else:
+                print(f"Response status code: {response.status_code}")
+
+            # Need the html table in a readable format for use. Use a pandas dataframe.
+            try:
+                html_table_dfs_list = pd.read_html(io=response.text, header=0, attrs={"id": html_id_hospital_table})
+            except ValueError as ve:
+
+                # Sometimes the web page does not contain a hospital table. No clue as to why but is temporary so retry.
+                print(ve)
+                print(f"Value Error: No tables found in html page. Expected 1 table with id = {html_id_hospital_table}")
+                print(f"WebPage: {url_string}, Response status code: {response.status_code}")
+                print("Sleeping for 5 sec before retrying.")
+
+                # Try another round, after small delay
+                time.sleep(5)
+                problem_encountered = True
+                continue
+            else:
+                # Html table of interest must have been present so move on.
+                pass
+
+            # Need to get the hospitals table by the html id for the table. HTML id's are unique so should be 1 table.
+            try:
+                html_table_df = html_table_dfs_list[0]  # html id's are unique so should only be 1 item in list
+            except IndexError as ie:
+
+                # Sometimes the web page contains an empty hospital table. No clue why but is temporary so retry.
+                print(ie)
+                print(f"Index Error: length of html_table_dfs_list is {len(html_table_dfs_list)}; Expected length = 1.")
+                print(f"WebPage where issue was encountered: {url_string}, Response status code: {response.status_code}")
+                print("Sleeping for 5 seconds before retrying one time.")
+                time.sleep(5)
+                problem_encountered = True
+                continue
+            else:
+                # Html table of interest must have content so break out of while loop.
+                break
+
+        # Check to see if used up the 3 attempts and if a problem was encountered on third attempt.
+        if round_count == 3 and problem_encountered:
+            print("Could not resolve issues with HTML with 3 rounds of attempts, each separated by 5 sec delay.")
+            print("Exiting")
             exit(code=1)
-
-        # Need to get the hospitals table by the html id for the table. HTML id's are unique so should be one table.
-        try:
-            html_table_df = html_table_dfs_list[0]  # html id's are unique so should only be one item in list
-        except IndexError as ie:
-            print(ie)
-            print(f"Index Error: length of html_table_dfs_list is {len(html_table_dfs_list)}; Expected length = 1.")
-            print(f"WebPage where issue was encountered: {url_string}, Response status code: {response.status_code}")
-            # print(f"Response text: {response.text}")
-            exit(code=1)
-        else:
-            print(html_table_df.info())
 
         # Need an iteration to provide rows from the dataframe.
         row_generator = html_table_df.iterrows()
@@ -173,7 +205,7 @@ def main():
                                                        created_date_string=current_date_time)
             values_string = sql_values_statement.format(values=values)
             sql_statements_list.append(values_string)
-
+    exit()
     # Database Transactions
     print("Database operations initiated...")
     database_name = parser[database_cfg_section_name]["NAME"]
