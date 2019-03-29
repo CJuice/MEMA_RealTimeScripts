@@ -1,7 +1,18 @@
 """
-TODO: Document
+This is a procedural script for populating MEMA database with NOAA river gauge data.
+
+This process queries an ArcGIS server REST endpoint. It queries for the gaugelid, state, location,
+observed, obstime, status, flood, moderate, major, and geometry fields and gets the results as JSON.
+The JSON is interrogated for the gaugelid, location, status, x, y, and obstime values. Gauge Dataclass
+objects are created with these values and stored in a list. The list of objects is accessed and used to
+generate the values in the insert sql statement. Once the insert statement is completed a database connection
+is established, all exiting records are deleted, and the new records are inserted.
+Redesigned from the original CGIS version when MEMA server environments were being migrated to new versions.
+Author: CJuice, 20190327
+Revisions:
 
 """
+
 
 def main():
 
