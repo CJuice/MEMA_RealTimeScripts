@@ -8,7 +8,11 @@ are used to insert the table data into a SQL table tracking the most data as of 
 is accessed by the OSPREY Dashboard and influences the results in the hospitals row.
 Redesigned from the original CGIS version when MEMA server environments were being migrated to new versions.
 Author: CJuice, 20190327
-
+Revisions: 20190329, CJuice: Sometimes the html page returned to the request does not contain the
+hospitals html table. Sometimes the html page contains the hospitals table but it is empty. We were getting
+failures every few hours due to these issues. On one run, a PROD task ran with issues and literally 2 seconds
+later an identical DEV task ran without issue, requesting from the same urls. Redesigned to have a while loop
+with three attempts each separated by a 5 second sleep. If don't succeed in three attempts then exit.
 """
 
 
