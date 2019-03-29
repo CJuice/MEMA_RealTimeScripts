@@ -30,7 +30,8 @@ def main():
 
     # VARIABLES
     _root_file_path = os.path.dirname(__file__)
-    config_file_path = r"doit_config_HospitalStatus.cfg"
+    config_file = r"doit_config_HospitalStatus.cfg"
+    config_file_path = os.path.join(_root_file_path, config_file)
     database_cfg_section_name = "DATABASE_DEV"
     database_connection_string = "DSN={database_name};UID={database_user};PWD={database_password}"
     html_id_hospital_table = "tblHospitals"
@@ -125,7 +126,7 @@ def main():
     print(f"Process Date & Time: {current_date_time}")
 
     # need parser to access credentials
-    parser = setup_config(config_file_path)
+    config_parser = setup_config(config_file_path)
 
     # need to get data, parse data, process data for each url in the list
     for url_index, url_string in enumerate(urls_list):
@@ -212,9 +213,9 @@ def main():
 
     # Database Transactions
     print("Database operations initiated...")
-    database_name = parser[database_cfg_section_name]["NAME"]
-    database_password = parser[database_cfg_section_name]["PASSWORD"]
-    database_user = parser[database_cfg_section_name]["USER"]
+    database_name = config_parser[database_cfg_section_name]["NAME"]
+    database_password = config_parser[database_cfg_section_name]["PASSWORD"]
+    database_user = config_parser[database_cfg_section_name]["USER"]
     full_connection_string = create_database_connection_string(db_name=database_name,
                                                                db_user=database_user,
                                                                db_password=database_password)
