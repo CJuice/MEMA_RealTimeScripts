@@ -209,7 +209,7 @@ def main():
                                                        created_date_string=current_date_time)
             values_string = sql_values_statement.format(values=values)
             sql_statements_list.append(values_string)
-    exit()
+
     # Database Transactions
     print("Database operations initiated...")
     database_name = parser[database_cfg_section_name]["NAME"]
