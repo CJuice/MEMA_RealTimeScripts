@@ -2,7 +2,6 @@
 TODO: Document
 
 """
-# FIXME: Cannot figure out why process writing to database doesn't stick. I can query it and write to it but data doesn't change in db table
 
 def main():
 
@@ -17,7 +16,8 @@ def main():
 
     # VARIABLES
     _root_file_path = os.path.dirname(__file__)
-    config_file_path = r"doit_config_NOAAObservedRiverGauge.cfg"
+    config_file = r"doit_config_NOAAObservedRiverGauge.cfg"
+    config_file_path = os.path.join(_root_file_path, config_file)
     database_cfg_section_name = "DATABASE_DEV"
     database_connection_string = "DSN={database_name};UID={database_user};PWD={database_password}"
     noaa_query_payload = {"where": "state = 'MD'",
@@ -91,7 +91,7 @@ def main():
     print(f"Process Date & Time: {current_date_time}")
 
     # need parser to access credentials
-    parser = setup_config(config_file_path)
+    config_parser = setup_config(config_file_path)
 
     # Make request to url
     try:
@@ -131,9 +131,9 @@ def main():
 
     # Database Transactions
     print("Database operations initiated...")
-    database_name = parser[database_cfg_section_name]["NAME"]
-    database_password = parser[database_cfg_section_name]["PASSWORD"]
-    database_user = parser[database_cfg_section_name]["USER"]
+    database_name = config_parser[database_cfg_section_name]["NAME"]
+    database_password = config_parser[database_cfg_section_name]["PASSWORD"]
+    database_user = config_parser[database_cfg_section_name]["USER"]
     full_connection_string = create_database_connection_string(db_name=database_name,
                                                                db_user=database_user,
                                                                db_password=database_password)
