@@ -62,17 +62,17 @@ def main():
         """
         return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-    def datetime_quality_control(gauge_obj_date: str) -> str:
+    def datetime_quality_control(gauge_obj: str) -> str:
         """
         Check the data generated value for the occasional N/A or any other unparsable value and set to new value
-        :param gauge_obj_date: value from NOAA query results
+        :param gauge_obj: value from NOAA query results
         :return: string
         """
         try:
-            converted = date_parser.parse(gauge_obj_date)
-        except:
-            print(f"Before: {gauge_obj_date}")
+            converted = date_parser.parse(gauge_obj.data_gen)
+        except ValueError as ve:
             converted = "1970-01-01 00:00:00"
+            print(f"Gauge {gauge_obj.gaugelid} {gauge_obj.location} date value was invalid {gauge_obj.data_gen} -> {converted}")
         return str(converted)
 
     def setup_config(cfg_file: str) -> configparser.ConfigParser:
@@ -119,7 +119,7 @@ def main():
                                   )
 
     for gauge_obj in gauge_objects_list:
-        gauge_obj.data_gen = datetime_quality_control(gauge_obj.data_gen)
+        gauge_obj.data_gen = datetime_quality_control(gauge_obj)
         values = sql_values_string_template.format(location=gauge_obj.location,
                                                    status=gauge_obj.status,
                                                    gaugelid=gauge_obj.gaugelid,
