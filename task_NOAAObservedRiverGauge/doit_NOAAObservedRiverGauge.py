@@ -31,6 +31,7 @@ def main():
     config_file_path = os.path.join(_root_file_path, config_file)
     database_cfg_section_name = "DATABASE_DEV"
     database_connection_string = "DSN={database_name};UID={database_user};PWD={database_password}"
+    gauge_objects_list = []
     noaa_query_payload = {"where": "state = 'MD'",
                           "outFields": "gaugelid,state,location,observed,obstime,status,flood,moderate,major",
                           "returnGeometry": "true",
@@ -114,7 +115,6 @@ def main():
         print(f"Response status code: {response.status_code}")
         response_json = response.json()
 
-    gauge_objects_list = []
     features = response_json["features"]
     for feature in features:
         attributes = feature.get("attributes", {})
