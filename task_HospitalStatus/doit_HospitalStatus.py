@@ -34,6 +34,7 @@ def main():
     config_file_path = os.path.join(_root_file_path, config_file)
     database_cfg_section_name = "DATABASE_DEV"
     database_connection_string = "DSN={database_name};UID={database_user};PWD={database_password}"
+    delay_seconds = 2
     html_id_hospital_table = "tblHospitals"
     realtime_hospitalstatus_headers = (
     "Linkname", "Status", "Yellow", "Red", "Mini", "ReRoute", "t_bypass", "DataGenerated")
@@ -59,12 +60,19 @@ def main():
                                                  database_user=db_user,
                                                  database_password=db_password)
 
-    def create_date_time_value() -> str:
+    def create_date_time_value_for_db() -> str:
         """
         Create a formatted date and time value as string
         :return: string date & time
         """
         return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+    def get_time():
+        """
+        Need the date/time for performance printing.
+        :return: datetime
+        """
+        return datetime.now()
 
     def determine_status_level(html_row_series: pd.Series):
         """
@@ -120,10 +128,20 @@ def main():
         cfg_parser.read(filenames=cfg_file)
         return cfg_parser
 
+    def time_elapsed(start=datetime.now()):
+        """
+        Calculate the difference between datetime.now() value and a start datetime value
+        :param start: datetime value
+        :return: datetime value
+        """
+        return datetime.now() - start
+
     # FUNCTIONALITY
+    start = get_time()
+    print(f"Process started: {start}")
+
     # need a current datetime stamp for database entry
-    current_date_time = str(create_date_time_value())
-    print(f"Process Date & Time: {current_date_time}")
+    start_date_time = create_date_time_value_for_db()
 
     # need parser to access credentials
     config_parser = setup_config(config_file_path)
@@ -136,7 +154,8 @@ def main():
         problem_encountered = False
         while round_count < 4:
             round_count += 1
-            print(f"HTML Table Issue Handling - Attempt Count: {round_count}")
+            print(f"\nHTML Table Issue Handling - Attempt Count: {round_count}")
+            print(f"Time elapsed {time_elapsed(start=start)}")
 
             # Setup blank variables, in case of multiple tries
             response = None
@@ -144,7 +163,7 @@ def main():
             html_table_df = None
 
             # Make request to url
-            print(f"\nMaking request to {url_string}")
+            print(f"Making request to {url_string}")
             try:
                 response = requests.get(url=url_string, params={})
             except Exception as e:
@@ -162,10 +181,10 @@ def main():
                 print(ve)
                 print(f"Value Error: No tables found in html page. Expected 1 table with id = {html_id_hospital_table}")
                 print(f"WebPage: {url_string}, Response status code: {response.status_code}")
-                print("Sleeping for 5 sec before retrying.")
+                print(f"Sleeping for {delay_seconds} seconds...")
 
                 # Try another round, after small delay
-                time.sleep(5)
+                time.sleep(delay_seconds)
                 problem_encountered = True
                 continue
             else:
@@ -181,8 +200,8 @@ def main():
                 print(ie)
                 print(f"Index Error: length of html_table_dfs_list is {len(html_table_dfs_list)}; Expected length = 1.")
                 print(f"WebPage where issue was encountered: {url_string}, Response status code: {response.status_code}")
-                print("Sleeping for 5 seconds before retrying one time.")
-                time.sleep(5)
+                print(f"Sleeping for {delay_seconds} seconds...")
+                time.sleep(delay_seconds)
                 problem_encountered = True
                 continue
             else:
@@ -191,8 +210,9 @@ def main():
 
         # Check to see if used up the 3 attempts and if a problem was encountered on third attempt.
         if round_count == 3 and problem_encountered:
-            print("Could not resolve issues with HTML with 3 rounds of attempts, each separated by 5 sec delay.")
+            print(f"Could not resolve issues with HTML in 3 rounds of attempts with {delay_seconds} second sleeps.")
             print("Exiting")
+            print(f"Time elapsed {time_elapsed(start=start)}")
             exit(code=1)
 
         # Need an iteration to provide rows from the dataframe.
@@ -207,12 +227,13 @@ def main():
                                                        mini_disaster=mini_disaster,
                                                        reroute=reroute,
                                                        trauma_bypass=trauma_bypass,
-                                                       created_date_string=current_date_time)
+                                                       created_date_string=start_date_time)
             values_string = sql_values_statement.format(values=values)
             sql_statements_list.append(values_string)
 
     # Database Transactions
-    print("Database operations initiated...")
+    print("\nDatabase operations initiated...")
+    print(f"Time elapsed {time_elapsed(start=start)}")
     database_name = config_parser[database_cfg_section_name]["NAME"]
     database_password = config_parser[database_cfg_section_name]["PASSWORD"]
     database_user = config_parser[database_cfg_section_name]["USER"]
@@ -238,7 +259,8 @@ def main():
         else:
             connection.commit()
 
-    print("Process completed.")
+    print("\nProcess completed.")
+    print(f"Time elapsed {time_elapsed(start=start)}")
 
 
 if __name__ == "__main__":
