@@ -5,17 +5,6 @@ TODO: Documentation
 
 def main():
     # IMPORTS
-    # from Original_Scripts.cgis_Configs import getConfig
-    # from Original_Scripts.cgis_Configs import getDBConnection
-    # from Original_Scripts.cgis_Transforms import transformStreamGages
-    # from Original_Scripts.cgis_Requests import simpleGetRequest
-    # from Original_Scripts.cgis_Parsers import parseJsonResponse
-    # from Original_Scripts.cgis_MapToSQL import applyDataMap
-    # from Original_Scripts.cgis_Configs import getMappingInfo
-    # import Original_Scripts.cgis_Updates as cgis_Updates
-    # from time import strftime
-    # import sys
-    # import traceback
     from dataclasses import dataclass
     from datetime import datetime
     from dateutil import parser as date_parser
@@ -75,13 +64,6 @@ def main():
         collect_date: str
 
     # FUNCTIONS
-    def create_date_time_value() -> str:
-        """
-        Create a formatted date and time value as string
-        :return: string date & time
-        """
-        return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-
     def create_database_connection_string(db_name: str, db_user: str, db_password: str) -> str:
         """
         Create the connection string for accessing database and return.
@@ -93,16 +75,16 @@ def main():
 
     def determine_gauge_height_value(variable_code, variable_value):
         if variable_code == "00060":
-            return np.NaN
+            return -9999
         if pd.isnull(variable_value):
-            return np.NaN
+            return -9999
         return float(variable_value)
 
     def determine_discharge_value(variable_code, variable_value):
         if variable_code == "00065":
-            return np.NaN
+            return -9999
         if pd.isnull(variable_value):
-            return np.NaN
+            return -9999
         return float(variable_value)
 
     def extract_collected_date(second_level_json):
@@ -276,27 +258,25 @@ def main():
     full_connection_string = create_database_connection_string(db_name=database_name,
                                                                db_user=database_user,
                                                                db_password=database_password)
-
+    database_table_name = realtime_usgsstreamgauge_tbl.format(database_name=database_name)
     # need the sql table headers as comma separated string values for use in the DELETE & INSERT statement
     headers_joined = ",".join([f"{val}" for val in usgs_streamgauge_headers])
-    sql_delete_string = sql_delete_template.format(table=realtime_usgsstreamgauge_tbl)
+    sql_delete_string = sql_delete_template.format(table=database_table_name)
 
     sql_insert_string = sql_insert_template.format(
-        table=realtime_usgsstreamgauge_tbl.format(database_name=database_name),
+        table=database_table_name,
         headers_joined=headers_joined)
     sql_insert_gen = sql_insert_generator(sql_values_list=sql_values_statements_list,
                                           step_increment=sql_insertion_step_increment,
                                           sql_insert_string=sql_insert_string)
-    # for batch in sql_insert_gen:
-    #     print(batch)
-    # exit()
+
     with pyodbc.connect(full_connection_string) as connection:
         cursor = connection.cursor()
 
         try:
             cursor.execute(sql_delete_string)
         except Exception as e:
-            print(f"Error deleting records from {realtime_usgsstreamgauge_tbl}. {e}")
+            print(f"Error deleting records from {database_table_name}. {e}")
             exit()
         else:
             print(f"Delete statement executed. Time elapsed {time_elapsed(start=start)}")
