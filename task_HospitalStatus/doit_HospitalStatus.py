@@ -15,6 +15,7 @@ later an identical DEV task ran without issue, requesting from the same urls. Re
 with three attempts each separated by a 5 second sleep. If don't succeed in three attempts then exit.
 """
 
+# TODO: Add task tracker writing
 
 def main():
 
@@ -43,6 +44,7 @@ def main():
     sql_values_statement = """({values})"""
     sql_values_statements_list = []
     sql_values_string_template = """'{hospital}', '{status_level_value}', '{red_alert}','{yellow_alert}', '{mini_disaster}', '{reroute}', '{trauma_bypass}', '{created_date_string}'"""
+    task_name = "HospitalStatus"
     urls_list = ["https://www.miemssalert.com/chats/Default.aspx?hdRegion=3",
                  "https://www.miemssalert.com/chats/Default.aspx?hdRegion=124",
                  "https://www.miemssalert.com/chats/Default.aspx?hdRegion=5"]
@@ -233,24 +235,30 @@ def main():
     full_connection_string = create_database_connection_string(db_name=database_name,
                                                                db_user=database_user,
                                                                db_password=database_password)
+    realtime_hopstat_tbl_string = realtime_hospstat_tbl.format(database_name=database_name)
 
     # need the sql table headers as comma separated string values for use in the DELETE & INSERT statement
     headers_joined = ",".join([f"{val}" for val in realtime_hospitalstatus_headers])
     sql_delete_insert_string = sql_delete_insert_template.format(
-        table=realtime_hospstat_tbl.format(database_name=database_name),
+        table=realtime_hopstat_tbl_string,
         headers_joined=headers_joined)
 
     # Build the entire SQL statement to be executed
     full_sql_string = sql_delete_insert_string + ",".join(sql_values_statements_list)
 
+    # Build the sql for updating the task tracker table for this process.
+    sql_task_tracker_update = f"UPDATE RealTime_TaskTracking SET lastRun = '{start_date_time}', DataGenerated = (SELECT max(DataGenerated) from {realtime_hopstat_tbl_string}) WHERE taskName = '{task_name}'"
+
     with pyodbc.connect(full_connection_string) as connection:
         cursor = connection.cursor()
         try:
             cursor.execute(full_sql_string)
+            cursor.execute(sql_task_tracker_update)
         except pyodbc.DataError:
             print(f"A value in the sql exceeds the field length allowed in database table: {full_sql_string}")
         else:
             connection.commit()
+            print(f"Commit successful. Time elapsed {time_elapsed(start=start)}")
 
     print("\nProcess completed.")
     print(f"Time elapsed {time_elapsed(start=start)}")
