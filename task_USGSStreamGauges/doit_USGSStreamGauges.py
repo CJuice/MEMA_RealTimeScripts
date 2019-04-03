@@ -20,8 +20,10 @@ def main():
     from datetime import datetime
     import configparser
     import numpy as np
+    import pandas as pd
     import requests
     import os
+    from dateutil import parser as date_parser
 
     # VARIABLES
     _root_file_path = os.path.dirname(__file__)
@@ -42,11 +44,13 @@ def main():
     # CLASSES
     @dataclass
     class Gauge:
+        state_abbrev: str
         site_name: str
         site_code: str
-        variable_code: str
-        variable_value: str
-        created_date: str
+        discharge: str
+        gauge_height: str
+        data_gen: str
+        collect_date: str
 
     # FUNCTIONS
     def create_date_time_value() -> str:
@@ -96,14 +100,14 @@ def main():
         try:
             return second_level_json.get("value", np.NaN)
         except Exception as e:
-            print(f"extract_variable_code(): {e}")
+            print(f"extract_variable_value(): {e}")
             return np.NaN
 
-    def extract_created_date(second_level_json):
+    def extract_collected_date(second_level_json):
         try:
             return second_level_json.get("dateTime", np.NaN)
         except Exception as e:
-            print(f"extract_variable_code(): {e}")
+            print(f"extract_collected_date(): {e}")
             return np.NaN
 
     def extract_source_info(gauge_json):
@@ -121,12 +125,54 @@ def main():
             return result3[0]
         except Exception as e:
             print(f"extract_second_level_values(): {e}")
-            return {}
+            return np.NaN
+
+    def extract_data_generated_value(value_json):
+        try:
+            result1 = value_json.get("queryInfo",{})
+            result2 = result1.get("note", [])
+            result3 = result2[3]
+            return result3.get("value", np.NaN)
+        except Exception as e:
+            print(f"extract_data_generated_value(): {e}")
+            return np.NaN
+
+    def determine_gauge_height_value(variable_code, variable_value):
+        if variable_code == "00060":
+            return np.NaN
+        if pd.isnull(variable_value):
+            return np.NaN
+        return variable_value
+
+    def determine_discharge_value(variable_code, variable_value):
+        if variable_code == "00065":
+            return np.NaN
+        if pd.isnull(variable_value):
+            return np.NaN
+        return variable_value
+
+    def process_site_code(site_code):
+        if pd.notnull(site_code):
+            return site_code
+
+    def process_date_string(date_string):
+        return date_parser.parse(date_string).strftime('%Y-%m-%d %H:%M:%S')
+
+    def time_elapsed(start=datetime.now()):
+        """
+        Calculate the difference between datetime.now() value and a start datetime value
+        :param start: datetime value
+        :return: datetime value
+        """
+        return datetime.now() - start
 
     # FUNCTIONALITY
+    start = datetime.now()
+    print(f"Process started: {start}")
+
     # need a current datetime stamp for process printout
-    current_date_time = str(create_date_time_value())
-    print(f"Process Date & Time: {current_date_time}")
+    # current_date_time = str(create_date_time_value())
+    # print(f"Process Date & Time: {current_date_time}")
 
     # need parser to access credentials
     config_parser = setup_config(config_file_path)
@@ -134,33 +180,46 @@ def main():
     # Make request to url and alter the state being requested
     for state_abbrev in state_abbreviations_list:
         usgs_query_payload["stateCd"] = state_abbrev
+        print(f"\nProcessing {state_abbrev.upper()}; Time elapsed {time_elapsed(start=start)}")
+
         try:
             response = requests.get(url=usgs_url, params=usgs_query_payload)
         except Exception as e:
             print(f"Exception during request for html page {usgs_url}. {e}")
+            print(f"Response status code: {response.status_code}")
             print(response.url)
+            print(f"Time elapsed {time_elapsed(start=start)}")
             exit()
         else:
-            print(f"Response status code: {response.status_code}")
             response_json = response.json()
             value_json = response_json.get("value", {})
             time_series_json = value_json.get("timeSeries", {})
+            data_gen_value = extract_data_generated_value(value_json=value_json)
+            data_gen_processed = process_date_string(date_string=data_gen_value)
             for gauge_json in time_series_json:
                 source_info_json = extract_source_info(gauge_json=gauge_json)
                 second_level_values_json = extract_second_level_values(gauge_json=gauge_json)
                 site_name = extract_site_name(source_info_json=source_info_json)
                 site_code = extract_site_code(source_info_json=source_info_json)
+                site_code_processed = process_site_code(site_code=site_code)
                 variable_code = extract_variable_code(gauge_json=gauge_json)
                 variable_value = extract_variable_value(second_level_json=second_level_values_json)
-                created_date = extract_created_date(second_level_json=second_level_values_json)
+                collected_date = extract_collected_date(second_level_json=second_level_values_json)
+                collected_date_processed = process_date_string(date_string=collected_date)
+                gauge_height = determine_gauge_height_value(variable_code=variable_code, variable_value=variable_value)
+                discharge = determine_discharge_value(variable_code=variable_code, variable_value=variable_value)
+                gauge_objects_list.append(Gauge(state_abbrev=state_abbrev,
+                                                site_name=site_name,
+                                                site_code=site_code_processed,
+                                                discharge=discharge,
+                                                gauge_height=gauge_height,
+                                                data_gen=data_gen_processed,
+                                                collect_date=collected_date_processed))
+            # for obj in gauge_objects_list:
+            #     print(obj)
 
-            exit()
-            # source_info_vals = response_json.get("sourceInfo", {})
-            # variable_vals = response_json.get("variable", {})
-            # values_vals = response_json.get("values", {})
-            # print(time_series_json)
-
-    return
+    print("\nProcess completed.")
+    print(f"Time elapsed {time_elapsed(start=start)}")
 
 
 if __name__ == "__main__":
