@@ -39,9 +39,9 @@ def main():
     realtime_hospitalstatus_headers = (
     "Linkname", "Status", "Yellow", "Red", "Mini", "ReRoute", "t_bypass", "DataGenerated")
     realtime_hospstat_tbl = "[{database_name}].[dbo].[RealTime_HospitalStatus]"
-    sql_delete_insert_template = """DELETE FROM {realtime_hospstat_tbl}; INSERT INTO {realtime_hospstat_tbl} ({headers_joined}) VALUES """
-    sql_statements_list = []
+    sql_delete_insert_template = """DELETE FROM {table}; INSERT INTO {table} ({headers_joined}) VALUES """
     sql_values_statement = """({values})"""
+    sql_values_statements_list = []
     sql_values_string_template = """'{hospital}', '{status_level_value}', '{red_alert}','{yellow_alert}', '{mini_disaster}', '{reroute}', '{trauma_bypass}', '{created_date_string}'"""
     urls_list = ["https://www.miemssalert.com/chats/Default.aspx?hdRegion=3",
                  "https://www.miemssalert.com/chats/Default.aspx?hdRegion=124",
@@ -222,7 +222,7 @@ def main():
                                                        trauma_bypass=trauma_bypass,
                                                        created_date_string=start_date_time)
             values_string = sql_values_statement.format(values=values)
-            sql_statements_list.append(values_string)
+            sql_values_statements_list.append(values_string)
 
     # Database Transactions
     print("\nDatabase operations initiated...")
@@ -237,11 +237,11 @@ def main():
     # need the sql table headers as comma separated string values for use in the DELETE & INSERT statement
     headers_joined = ",".join([f"{val}" for val in realtime_hospitalstatus_headers])
     sql_delete_insert_string = sql_delete_insert_template.format(
-        realtime_hospstat_tbl=realtime_hospstat_tbl.format(database_name=database_name),
+        table=realtime_hospstat_tbl.format(database_name=database_name),
         headers_joined=headers_joined)
 
     # Build the entire SQL statement to be executed
-    full_sql_string = sql_delete_insert_string + ",".join(sql_statements_list)
+    full_sql_string = sql_delete_insert_string + ",".join(sql_values_statements_list)
 
     with pyodbc.connect(full_connection_string) as connection:
         cursor = connection.cursor()
