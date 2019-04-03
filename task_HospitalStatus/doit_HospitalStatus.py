@@ -67,13 +67,6 @@ def main():
         """
         return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-    def get_time():
-        """
-        Need the date/time for performance printing.
-        :return: datetime
-        """
-        return datetime.now()
-
     def determine_status_level(html_row_series: pd.Series):
         """
         Evaluate presence of data in html table and return string based on business logic tree.
@@ -137,7 +130,7 @@ def main():
         return datetime.now() - start
 
     # FUNCTIONALITY
-    start = get_time()
+    start = datetime.now()
     print(f"Process started: {start}")
 
     # need a current datetime stamp for database entry
