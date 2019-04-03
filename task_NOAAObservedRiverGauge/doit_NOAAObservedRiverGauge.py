@@ -13,6 +13,7 @@ Revisions:
 
 """
 
+# TODO: Add task tracker writing
 
 def main():
 
@@ -43,6 +44,7 @@ def main():
     sql_values_statement = """({values})"""
     sql_values_statements_list = []
     sql_values_string_template = """'{gaugelid}', '{location}', '{status}', {longitude}, {latitude}, '{data_gen}'"""
+    task_name = "NOAAStreamGages"
 
     # ASSERTS
     assert os.path.exists(config_file_path)
@@ -67,14 +69,14 @@ def main():
                                                  database_user=db_user,
                                                  database_password=db_password)
 
-    def create_date_time_value() -> str:
+    def create_date_time_value_for_db() -> str:
         """
         Create a formatted date and time value as string
         :return: string date & time
         """
         return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-    def datetime_quality_control(gauge_obj: str) -> str:
+    def datetime_quality_control(gauge_obj: Gauge) -> str:
         """
         Check the data generated value for the occasional N/A or any other unparsable value and set to new value
         :param gauge_obj: value from NOAA query results
@@ -97,10 +99,21 @@ def main():
         cfg_parser.read(filenames=cfg_file)
         return cfg_parser
 
+    def time_elapsed(start=datetime.now()):
+        """
+        Calculate the difference between datetime.now() value and a start datetime value
+        :param start: datetime value
+        :return: datetime value
+        """
+        return datetime.now() - start
+
     # FUNCTIONALITY
     # need a current datetime stamp for process printout
-    current_date_time = str(create_date_time_value())
-    print(f"Process Date & Time: {current_date_time}")
+    start = datetime.now()
+    print(f"Process started: {start}")
+
+    # need a current datetime stamp for database entry
+    start_date_time = create_date_time_value_for_db()
 
     # need parser to access credentials
     config_parser = setup_config(config_file_path)
@@ -112,8 +125,9 @@ def main():
         print(f"Exception during request for html page {noaa_url}. {e}")
         exit()
     else:
-        print(f"Response status code: {response.status_code}")
         response_json = response.json()
+        print(f"Response status code: {response.status_code}")
+        print(f"Time elapsed {time_elapsed(start=start)}")
 
     features = response_json["features"]
     for feature in features:
@@ -141,34 +155,40 @@ def main():
         sql_values_statements_list.append(values_string)
 
     # Database Transactions
-    print("Database operations initiated...")
+    print(f"Database operations initiated. Time elapsed {time_elapsed(start=start)}")
     database_name = config_parser[database_cfg_section_name]["NAME"]
     database_password = config_parser[database_cfg_section_name]["PASSWORD"]
     database_user = config_parser[database_cfg_section_name]["USER"]
     full_connection_string = create_database_connection_string(db_name=database_name,
                                                                db_user=database_user,
                                                                db_password=database_password)
+    realtime_noaaobservedrivergauge_tbl_string = realtime_noaaobservedrivergauge_tbl.format(database_name=database_name)
 
     # need the sql table headers as comma separated string values for use in the DELETE & INSERT statement
     headers_joined = ",".join([f"{val}" for val in realtime_noaaobservedrivergauge_headers])
     sql_delete_insert_string = sql_delete_insert_template.format(
-        table=realtime_noaaobservedrivergauge_tbl.format(database_name=database_name),
+        table=realtime_noaaobservedrivergauge_tbl_string,
         headers_joined=headers_joined)
 
     # Build the entire SQL statement to be executed
     full_sql_string = sql_delete_insert_string + ",".join(sql_values_statements_list)
 
+    # Build the sql for updating the task tracker table for this process.
+    sql_task_tracker_update = f"UPDATE RealTime_TaskTracking SET lastRun = '{start_date_time}', DataGenerated = (SELECT max(DataGenerated) from {realtime_noaaobservedrivergauge_tbl_string}) WHERE taskName = '{task_name}'"
+
     with pyodbc.connect(full_connection_string) as connection:
         cursor = connection.cursor()
         try:
             cursor.execute(full_sql_string)
+            # cursor.execute(sql_task_tracker_update) # There isn't a record in the task tracker for NOAA Stream Gauges
         except pyodbc.DataError:
             print(f"A value in the sql exceeds the field length allowed in database table: {full_sql_string}")
         else:
             connection.commit()
-            print(f"Row Count: {cursor.rowcount}")
+            print(f"Commit successful. Time elapsed {time_elapsed(start=start)}")
 
-    print("Process completed.")
+    print("\nProcess completed.")
+    print(f"Time elapsed {time_elapsed(start=start)}")
 
 
 if __name__ == "__main__":

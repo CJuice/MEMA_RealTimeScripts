@@ -1,7 +1,7 @@
 """
 TODO: Documentation
 """
-
+# TODO: Add task tracker writing
 
 def main():
     # IMPORTS
@@ -29,6 +29,7 @@ def main():
     sql_values_statements_list = []
     sql_values_string_template = """'{site_number}', '{discharge}', '{gauge_height}','{status}', '{collected_date}', '{data_gen}'"""
     state_abbreviations_list = ["md", "dc", "de", "pa", "wv", "va", "nc", "sc"]
+    task_name = "USGSStreamGages"
     usgs_query_payload = {"format": "json",
                           "stateCd": None,
                           "parameterCd": "00060,00065",
@@ -72,6 +73,13 @@ def main():
         return database_connection_string.format(database_name=db_name,
                                                  database_user=db_user,
                                                  database_password=db_password)
+
+    def create_date_time_value_for_db() -> str:
+        """
+        Create a formatted date and time value as string
+        :return: string date & time
+        """
+        return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     def determine_gauge_height_value(variable_code, variable_value):
         if variable_code == "00060":
@@ -191,9 +199,9 @@ def main():
     start = datetime.now()
     print(f"Process started: {start}")
 
-    # need a current datetime stamp for process printout
-    # current_date_time = str(create_date_time_value())
-    # print(f"Process Date & Time: {current_date_time}")
+    # need a current datetime stamp for database entry
+    start_date_time = create_date_time_value_for_db()
+
 
     # need parser to access credentials
     config_parser = setup_config(config_file_path)
@@ -201,7 +209,7 @@ def main():
     # Make request to url and alter the state being requested
     for state_abbrev in state_abbreviations_list:
         usgs_query_payload["stateCd"] = state_abbrev
-        print(f"\nProcessing {state_abbrev.upper()}; Time elapsed {time_elapsed(start=start)}")
+        print(f"\nProcessing {state_abbrev.upper()}. Time elapsed {time_elapsed(start=start)}")
 
         try:
             response = requests.get(url=usgs_url, params=usgs_query_payload)
@@ -270,6 +278,9 @@ def main():
                                           step_increment=sql_insertion_step_increment,
                                           sql_insert_string=sql_insert_string)
 
+    # Build the sql for updating the task tracker table for this process.
+    sql_task_tracker_update = f"UPDATE RealTime_TaskTracking SET lastRun = '{start_date_time}', DataGenerated = (SELECT max(DataGenerated) from {database_table_name}) WHERE taskName = '{task_name}'"
+
     with pyodbc.connect(full_connection_string) as connection:
         cursor = connection.cursor()
 
@@ -290,10 +301,25 @@ def main():
             else:
                 print(f"Executing insert batch {insert_round_count}. Time elapsed {time_elapsed(start=start)}")
                 insert_round_count += 1
+        try:
+            cursor.execute(sql_task_tracker_update)
+        except pyodbc.DataError:
+            print(f"A value in the sql exceeds the field length allowed in database table: {sql_task_tracker_update}")
+
         connection.commit()
         print(f"Commit successful. Time elapsed {time_elapsed(start=start)}")
 
-    # TODO: Execute stored procedure RealTime_UpdateUSGSStreamGagesSTatus or replace functionality
+    with pyodbc.connect(full_connection_string) as connection:
+        cursor = connection.cursor()
+
+        try:
+            cursor.execute("exec RealTime_UpdateUSGSStreamGagesStatus")
+        except Exception as e:
+            print(f"Error executing stored procedure RealTime_UpdateUSGSStreamGagesStatus. {e}")
+            exit()
+        else:
+            connection.commit()
+            print(f"Stored procedure executed. Time elapsed {time_elapsed(start=start)}")
 
     print("\nProcess completed.")
     print(f"Time elapsed {time_elapsed(start=start)}")
