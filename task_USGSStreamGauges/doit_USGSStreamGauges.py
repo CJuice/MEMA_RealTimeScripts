@@ -33,12 +33,19 @@ def main():
     database_cfg_section_name = "DATABASE_DEV"
     database_connection_string = "DSN={database_name};UID={database_user};PWD={database_password}"
     gauge_objects_list = []
+    sql_delete_template = """DELETE FROM {table};"""
+    sql_insert_template = """INSERT INTO {table} ({headers_joined}) VALUES """
+    sql_insertion_step_increment = 1000
+    sql_values_statement = """({values})"""
+    sql_values_statements_list = []
+    sql_values_string_template = """'{site_number}', '{discharge}', '{gauge_height}','{status}', '{collected_date}', '{data_gen}'"""
     state_abbreviations_list = ["md", "dc", "de", "pa", "wv", "va", "nc", "sc"]
     usgs_query_payload = {"format": "json",
                           "stateCd": None,
                           "parameterCd": "00060,00065",
                           "siteStatus": "active"}
-    usgs_streamgauge_tablename = "RealTime_USGSStreamGages"
+    usgs_streamgauge_headers = ("SiteNumber", "Discharge", "GageHeight", "Status", "collectedDate", "DataGenerated")
+    realtime_usgsstreamgauge_tbl = "[{database_name}].[dbo].[RealTime_USGSStreamGages]"
     usgs_url = r"http://waterservices.usgs.gov/nwis/iv/"
 
     streamGagesInfo = {
@@ -182,6 +189,14 @@ def main():
         cfg_parser.read(filenames=cfg_file)
         return cfg_parser
 
+    def sql_insert_generator(sql_values_list, step_increment, sql_insert_string):
+        for i in range(0, len(sql_values_list), step_increment):
+            values_in_range = sql_values_list[i: i + step_increment]
+
+            # Build the entire SQL statement to be executed
+            output = sql_insert_string + ",".join(values_in_range)
+            yield output
+
     def time_elapsed(start=datetime.now()):
         """
         Calculate the difference between datetime.now() value and a start datetime value
@@ -243,11 +258,17 @@ def main():
                                                 gauge_height=gauge_height,
                                                 data_gen=data_gen_processed,
                                                 collect_date=collected_date_processed))
-            # for obj in gauge_objects_list:
-            #     print(obj)
+    for gauge_obj in gauge_objects_list:
+        values = sql_values_string_template.format(site_number=gauge_obj.site_code,
+                                                   discharge=gauge_obj.discharge,
+                                                   gauge_height=gauge_obj.gauge_height,
+                                                   status=np.NaN,
+                                                   collected_date=gauge_obj.collect_date,
+                                                   data_gen=gauge_obj.data_gen)
+        values_string = sql_values_statement.format(values=values)
+        sql_values_statements_list.append(values_string)
 
     # Database Transactions
-    # TODO: Remember to do the insert in chunks. According to old process there is a 1000 record max limit.
     print(f"\nDatabase operations initiated. Time elapsed {time_elapsed(start=start)}")
     database_name = config_parser[database_cfg_section_name]["NAME"]
     database_password = config_parser[database_cfg_section_name]["PASSWORD"]
@@ -257,28 +278,45 @@ def main():
                                                                db_password=database_password)
 
     # need the sql table headers as comma separated string values for use in the DELETE & INSERT statement
-    headers_joined = ",".join([f"{val}" for val in realtime_hospitalstatus_headers])
-    sql_delete_insert_string = sql_delete_insert_template.format(
-        realtime_hospstat_tbl=realtime_hospstat_tbl.format(database_name=database_name),
+    headers_joined = ",".join([f"{val}" for val in usgs_streamgauge_headers])
+    sql_delete_string = sql_delete_template.format(table=realtime_usgsstreamgauge_tbl)
+
+    sql_insert_string = sql_insert_template.format(
+        table=realtime_usgsstreamgauge_tbl.format(database_name=database_name),
         headers_joined=headers_joined)
-
-    # Build the entire SQL statement to be executed
-    full_sql_string = sql_delete_insert_string + ",".join(sql_statements_list)
-
+    sql_insert_gen = sql_insert_generator(sql_values_list=sql_values_statements_list,
+                                          step_increment=sql_insertion_step_increment,
+                                          sql_insert_string=sql_insert_string)
+    # for batch in sql_insert_gen:
+    #     print(batch)
+    # exit()
     with pyodbc.connect(full_connection_string) as connection:
         cursor = connection.cursor()
+
         try:
-            cursor.execute(full_sql_string)
-        except pyodbc.DataError:
-            print(f"A value in the sql exceeds the field length allowed in database table: {full_sql_string}")
+            cursor.execute(sql_delete_string)
+        except Exception as e:
+            print(f"Error deleting records from {realtime_usgsstreamgauge_tbl}. {e}")
+            exit()
         else:
-            connection.commit()
+            print(f"Delete statement executed. Time elapsed {time_elapsed(start=start)}")
+
+        insert_round_count = 1
+        for batch in sql_insert_gen:
+            try:
+                cursor.execute(batch)
+            except pyodbc.DataError:
+                print(f"A value in the sql exceeds the field length allowed in database table: {batch}")
+            else:
+                print(f"Executing insert batch {insert_round_count}. Time elapsed {time_elapsed(start=start)}")
+                insert_round_count += 1
+        connection.commit()
+        print(f"Commit successful. Time elapsed {time_elapsed(start=start)}")
 
     # TODO: Execute stored procedure RealTime_UpdateUSGSStreamGagesSTatus or replace functionality
 
     print("\nProcess completed.")
     print(f"Time elapsed {time_elapsed(start=start)}")
-    print(len(gauge_objects_list))
 
 
 if __name__ == "__main__":
