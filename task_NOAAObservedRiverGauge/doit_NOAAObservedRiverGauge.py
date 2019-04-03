@@ -39,9 +39,9 @@ def main():
     noaa_url = r"https://idpgis.ncep.noaa.gov/arcgis/rest/services/NWS_Observations/ahps_riv_gauges/MapServer/0/query?"
     realtime_noaaobservedrivergauge_headers = ("GaugeID", "Location", "Status", "X", "Y", "DataGenerated")
     realtime_noaaobservedrivergauge_tbl = "[{database_name}].[dbo].[RealTime_NOAAObservedRiverGauges]"
-    sql_delete_insert_template = """DELETE FROM {realtime_noaaobservedrivergauge_tbl}; INSERT INTO {realtime_noaaobservedrivergauge_tbl} ({headers_joined}) VALUES """
-    sql_statements_list = []
+    sql_delete_insert_template = """DELETE FROM {table}; INSERT INTO {table} ({headers_joined}) VALUES """
     sql_values_statement = """({values})"""
+    sql_values_statements_list = []
     sql_values_string_template = """'{gaugelid}', '{location}', '{status}', {longitude}, {latitude}, '{data_gen}'"""
 
     # ASSERTS
@@ -138,7 +138,7 @@ def main():
                                                    longitude=gauge_obj.longitude,
                                                    data_gen=gauge_obj.data_gen)
         values_string = sql_values_statement.format(values=values)
-        sql_statements_list.append(values_string)
+        sql_values_statements_list.append(values_string)
 
     # Database Transactions
     print("Database operations initiated...")
@@ -152,11 +152,11 @@ def main():
     # need the sql table headers as comma separated string values for use in the DELETE & INSERT statement
     headers_joined = ",".join([f"{val}" for val in realtime_noaaobservedrivergauge_headers])
     sql_delete_insert_string = sql_delete_insert_template.format(
-        realtime_noaaobservedrivergauge_tbl=realtime_noaaobservedrivergauge_tbl.format(database_name=database_name),
+        table=realtime_noaaobservedrivergauge_tbl.format(database_name=database_name),
         headers_joined=headers_joined)
 
     # Build the entire SQL statement to be executed
-    full_sql_string = sql_delete_insert_string + ",".join(sql_statements_list)
+    full_sql_string = sql_delete_insert_string + ",".join(sql_values_statements_list)
 
     with pyodbc.connect(full_connection_string) as connection:
         cursor = connection.cursor()
