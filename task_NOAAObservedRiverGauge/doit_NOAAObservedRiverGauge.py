@@ -13,7 +13,6 @@ Revisions:
 
 """
 
-# TODO: Add task tracker writing
 
 def main():
 
@@ -44,7 +43,7 @@ def main():
     sql_values_statement = """({values})"""
     sql_values_statements_list = []
     sql_values_string_template = """'{gaugelid}', '{location}', '{status}', {longitude}, {latitude}, '{data_gen}'"""
-    task_name = "NOAAStreamGages"
+    task_name = "NOAAStreamGauges"
 
     # ASSERTS
     assert os.path.exists(config_file_path)
@@ -180,7 +179,7 @@ def main():
         cursor = connection.cursor()
         try:
             cursor.execute(full_sql_string)
-            # cursor.execute(sql_task_tracker_update) # There isn't a record in the task tracker for NOAA Stream Gauges
+            cursor.execute(sql_task_tracker_update) # There isn't a record in the task tracker for NOAA Stream Gauges
         except pyodbc.DataError:
             print(f"A value in the sql exceeds the field length allowed in database table: {full_sql_string}")
         else:
