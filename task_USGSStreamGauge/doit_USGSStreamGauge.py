@@ -389,6 +389,8 @@ def main():
             else:
                 print(f"Executing insert batch {insert_round_count}. Time elapsed {time_elapsed(start=start)}")
                 insert_round_count += 1
+
+        # Need to update the task tracker table to record last run time
         try:
             cursor.execute(sql_task_tracker_update)
         except pyodbc.DataError:
