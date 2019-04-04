@@ -1,9 +1,22 @@
 """
-TODO: Documentation
+This is a procedural script for populating MEMA database with USGS stream gauge data.
+
+This process makes request to USGS web services. It captures the site number, collected date, data generated date,
+and determines the discharge, gauge height, and status from response JSON.
+Gauge Dataclass objects are created with these values and stored in a list. The list of objects is accessed and used to
+generate the values in the insert sql statement. Once the insert statement is completed a database connection
+is established, all existing records are deleted, and the new records are inserted. The number of gauge records
+to be inserted exceeds the 1000 record sql limit so insert statements happen in rounds of 1000 records. At time
+of design there were over 2400 gauges.
+Redesigned from the original CGIS version when MEMA server environments were being migrated to new versions.
+Author: CJuice, 20190404
+Revisions:
+
 """
-# TODO: Add task tracker writing
+
 
 def main():
+
     # IMPORTS
     from dataclasses import dataclass
     from datetime import datetime
@@ -22,6 +35,7 @@ def main():
     database_cfg_section_name = "DATABASE_DEV"
     database_connection_string = "DSN={database_name};UID={database_user};PWD={database_password}"
     gauge_objects_list = []
+    realtime_usgsstreamgauge_tbl = "[{database_name}].[dbo].[RealTime_USGSStreamGages]"
     sql_delete_template = """DELETE FROM {table};"""
     sql_insert_template = """INSERT INTO {table} ({headers_joined}) VALUES """
     sql_insertion_step_increment = 1000
@@ -35,20 +49,7 @@ def main():
                           "parameterCd": "00060,00065",
                           "siteStatus": "active"}
     usgs_streamgauge_headers = ("SiteNumber", "Discharge", "GageHeight", "Status", "collectedDate", "DataGenerated")
-    realtime_usgsstreamgauge_tbl = "[{database_name}].[dbo].[RealTime_USGSStreamGages]"
     usgs_url = r"http://waterservices.usgs.gov/nwis/iv/"
-
-    streamGagesInfo = {
-        "details":
-            {"tablename": "RealTime_USGSStreamGages"},
-        "mapping": [
-            {"input": "collectedDate", "output": "collectedDate", "type": "datetime %Y-%m-%d %H:%M:%S"},
-            {"input": "DataGenerated", "output": "DataGenerated", "type": "datetime %Y-%m-%d %H:%M:%S"},
-            {"input": "siteCode", "output": "SiteNumber", "type": "string"},
-            {"input": "gage_height", "output": "GageHeight", "type": "float"},
-            {"input": "discharge", "output": "Discharge", "type": "float"},
-        ]
-    }
 
     # ASSERTS
     assert os.path.exists(config_file_path)
@@ -56,6 +57,9 @@ def main():
     # CLASSES
     @dataclass
     class Gauge:
+        """
+        Data class for holding essential values about a Gauge; most values inserted into SQL database
+        """
         state_abbrev: str
         site_name: str
         site_code: str
@@ -81,14 +85,30 @@ def main():
         """
         return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-    def determine_gauge_height_value(variable_code, variable_value):
+    def determine_gauge_height_value(variable_code, variable_value) -> float:
+        """
+        Determine the gauge height value based on the variable code and value values.
+        This was inherited logic from the old CGIS code. There were no notes on the basis of this design so the
+        design was brought into the new flow for consistency.
+        :param variable_code: value from response JSON
+        :param variable_value: value from response JSON
+        :return: float
+        """
         if variable_code == "00060":
             return -9999
         if pd.isnull(variable_value):
             return -9999
         return float(variable_value)
 
-    def determine_discharge_value(variable_code, variable_value):
+    def determine_discharge_value(variable_code, variable_value) -> float:
+        """
+        Determine the discharge value based on the variable code and value values.
+        This was inherited logic from the old CGIS code. There were no notes on the basis of this design so the
+        design was brought into the new flow for consistency.
+        :param variable_code: value from response JSON
+        :param variable_value: value from response JSON
+        :return: float
+        """
         if variable_code == "00065":
             return -9999
         if pd.isnull(variable_value):
@@ -96,6 +116,11 @@ def main():
         return float(variable_value)
 
     def extract_collected_date(second_level_json):
+        """
+        Extract the value associated with the 'dateTime' key in the json
+        :param second_level_json: json resulting from two levels of value(s) key extraction
+        :return: value or numpy nan
+        """
         try:
             return second_level_json.get("dateTime", np.NaN)
         except Exception as e:
@@ -103,6 +128,11 @@ def main():
             return np.NaN
 
     def extract_site_code(source_info_json):
+        """
+        Extract the value associated with the 'siteCode' key in the json
+        :param source_info_json: json resulting from 'sourceInfo' key extraction
+        :return: value or numpy nan
+        """
         try:
             result1 = source_info_json.get("siteCode", [])
             result2 = result1[0]
@@ -112,6 +142,11 @@ def main():
             return np.NaN
 
     def extract_site_name(source_info_json):
+        """
+        Extract the value associated with the 'siteName' key in the json
+        :param source_info_json: json resulting from 'sourceInfo' key extraction
+        :return: value or numpy nan
+        """
         try:
             return source_info_json.get("siteName", np.NaN)
         except Exception as e:
@@ -119,6 +154,11 @@ def main():
             return np.NaN
 
     def extract_source_info(gauge_json):
+        """
+        Extract the value associate with the 'sourceInfo' key in the json
+        :param gauge_json: gauge json object from the time series json
+        :return: value or empty dict
+        """
         try:
             return gauge_json.get("sourceInfo", {})
         except Exception as e:
@@ -126,6 +166,11 @@ def main():
             return {}
 
     def extract_variable_code(gauge_json):
+        """
+        Multiple extractions of keys and values from gauge json object to get the variable code value
+        :param gauge_json: gauge json object from the time series json
+        :return: value or numpy nan
+        """
         try:
             result1 = gauge_json.get("variable", {})
             result2 = result1.get("variableCode", {})
@@ -136,6 +181,11 @@ def main():
             return np.NaN
 
     def extract_variable_value(second_level_json):
+        """
+        Extract the variable value from the second level json
+        :param second_level_json: json resulting from two levels of value(s) key extraction
+        :return:
+        """
         try:
             return second_level_json.get("value", np.NaN)
         except Exception as e:
@@ -143,6 +193,11 @@ def main():
             return np.NaN
 
     def extract_second_level_values(gauge_json):
+        """
+        Multiple extractions of keys and values from gauge json object to get second level values for further use
+        :param gauge_json: gauge json object from the time series json
+        :return: value or numpy nan
+        """
         try:
             result1 = gauge_json.get("values", [])
             result2 = result1[0]
@@ -153,6 +208,11 @@ def main():
             return np.NaN
 
     def extract_data_generated_value(value_json):
+        """
+        Extract the data generated value from the response json
+        :param value_json: json from 'value' key in response json
+        :return: value or numpy nan
+        """
         try:
             result1 = value_json.get("queryInfo",{})
             result2 = result1.get("note", [])
@@ -163,11 +223,24 @@ def main():
             return np.NaN
 
     def process_date_string(date_string):
+        """
+        Parse the date string to datetime format using the dateutil parser and return string formatted
+        Old CGIS way was to manipulate string by removing a 'T' and doing other actions instead of using module
+        :param date_string: string extracted from response json
+        :return: date/time string formatted as indicated
+        """
         return date_parser.parse(date_string).strftime('%Y-%m-%d %H:%M:%S')
 
     def process_site_code(site_code):
+        """
+        Determine if the site code value is null or not null
+        :param site_code: value from response json extraction
+        :return: value or numpy nan
+        """
         if pd.notnull(site_code):
             return site_code
+        else:
+            return np.NaN
 
     def setup_config(cfg_file: str) -> configparser.ConfigParser:
         """
@@ -180,6 +253,14 @@ def main():
         return cfg_parser
 
     def sql_insert_generator(sql_values_list, step_increment, sql_insert_string):
+        """
+        Generator for yielding batches of sql values for insertion
+        Purpose is to work with the 1000 record limit of SQL insertion.
+        :param sql_values_list: list of prebuilt record values ready for sql insertion
+        :param step_increment: the record count increment for insertion batches
+        :param sql_insert_string: sql statement string for use with values
+        :return: yield a string for use in insertion
+        """
         for i in range(0, len(sql_values_list), step_increment):
             values_in_range = sql_values_list[i: i + step_increment]
 
@@ -202,11 +283,10 @@ def main():
     # need a current datetime stamp for database entry
     start_date_time = create_date_time_value_for_db()
 
-
     # need parser to access credentials
     config_parser = setup_config(config_file_path)
 
-    # Make request to url and alter the state being requested
+    # Make request to url and alter the US state being requested
     for state_abbrev in state_abbreviations_list:
         usgs_query_payload["stateCd"] = state_abbrev
         print(f"\nProcessing {state_abbrev.upper()}. Time elapsed {time_elapsed(start=start)}")
@@ -220,6 +300,7 @@ def main():
             print(f"Time elapsed {time_elapsed(start=start)}")
             exit()
         else:
+            # extract values from response json for gauge json object interrogation and Gauge object creation
             response_json = response.json()
             value_json = response_json.get("value", {})
             time_series_json = value_json.get("timeSeries", {})
@@ -227,6 +308,7 @@ def main():
             data_gen = extract_data_generated_value(value_json=value_json)
             data_gen_processed = process_date_string(date_string=data_gen)
 
+            # Need to iterate over gauge objects in time series json and extract/process data for values of interest
             for gauge_json in time_series_json:
                 source_info_json = extract_source_info(gauge_json=gauge_json)
                 second_level_values_json = extract_second_level_values(gauge_json=gauge_json)
@@ -235,12 +317,12 @@ def main():
                 variable_code = extract_variable_code(gauge_json=gauge_json)
                 variable_value = extract_variable_value(second_level_json=second_level_values_json)
                 collected_date = extract_collected_date(second_level_json=second_level_values_json)
-
                 collected_date_processed = process_date_string(date_string=collected_date)
                 discharge = determine_discharge_value(variable_code=variable_code, variable_value=variable_value)
                 gauge_height = determine_gauge_height_value(variable_code=variable_code, variable_value=variable_value)
                 site_code_processed = process_site_code(site_code=site_code)
 
+                # Need to build the Gauge objects and store for use in sql inseration
                 gauge_objects_list.append(Gauge(state_abbrev=state_abbrev,
                                                 site_name=site_name,
                                                 site_code=site_code_processed,
@@ -248,6 +330,8 @@ def main():
                                                 gauge_height=gauge_height,
                                                 data_gen=data_gen_processed,
                                                 collect_date=collected_date_processed))
+
+    # Need to build the values string statements for use later on with sql insert statement.
     for gauge_obj in gauge_objects_list:
         values = sql_values_string_template.format(site_number=gauge_obj.site_code,
                                                    discharge=gauge_obj.discharge,
@@ -267,13 +351,15 @@ def main():
                                                                db_user=database_user,
                                                                db_password=database_password)
     database_table_name = realtime_usgsstreamgauge_tbl.format(database_name=database_name)
+
     # need the sql table headers as comma separated string values for use in the DELETE & INSERT statement
     headers_joined = ",".join([f"{val}" for val in usgs_streamgauge_headers])
     sql_delete_string = sql_delete_template.format(table=database_table_name)
-
     sql_insert_string = sql_insert_template.format(
         table=database_table_name,
         headers_joined=headers_joined)
+
+    # Need the insert statement generator to be ready for database insertion rounds
     sql_insert_gen = sql_insert_generator(sql_values_list=sql_values_statements_list,
                                           step_increment=sql_insertion_step_increment,
                                           sql_insert_string=sql_insert_string)
@@ -284,6 +370,7 @@ def main():
     with pyodbc.connect(full_connection_string) as connection:
         cursor = connection.cursor()
 
+        # Due to 1000 record insert limit, delete records first and then do insertion rounds for 2400+ gauges
         try:
             cursor.execute(sql_delete_string)
         except Exception as e:
@@ -292,6 +379,7 @@ def main():
         else:
             print(f"Delete statement executed. Time elapsed {time_elapsed(start=start)}")
 
+        # Need insert statement in rounds of 1000 records or less to avoid sql limit
         insert_round_count = 1
         for batch in sql_insert_gen:
             try:
@@ -309,6 +397,8 @@ def main():
         connection.commit()
         print(f"Commit successful. Time elapsed {time_elapsed(start=start)}")
 
+    # Old process executed a stored procedure for updating the Gauge locations table with status information based
+    #   on business logic in the stored procedure.
     with pyodbc.connect(full_connection_string) as connection:
         cursor = connection.cursor()
 
