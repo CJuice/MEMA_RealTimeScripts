@@ -179,7 +179,7 @@ def main():
         cursor = connection.cursor()
         try:
             cursor.execute(full_sql_string)
-            cursor.execute(sql_task_tracker_update) # There isn't a record in the task tracker for NOAA Stream Gauges
+            cursor.execute(sql_task_tracker_update)
         except pyodbc.DataError:
             print(f"A value in the sql exceeds the field length allowed in database table: {full_sql_string}")
         else:
