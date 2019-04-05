@@ -15,9 +15,9 @@ later an identical DEV task ran without issue, requesting from the same urls. Re
 with three attempts each separated by a 5 second sleep. If don't succeed in three attempts then exit.
 """
 
-# TODO: Add task tracker writing
 
 def main():
+    print(f"main() entered.")
 
     # IMPORTS
     from datetime import datetime
@@ -28,6 +28,7 @@ def main():
     import pyodbc
     import requests
     import time
+    print(f"Imports completed.")
 
     # VARIABLES
     _root_file_path = os.path.dirname(__file__)
@@ -48,9 +49,11 @@ def main():
     urls_list = ["https://www.miemssalert.com/chats/Default.aspx?hdRegion=3",
                  "https://www.miemssalert.com/chats/Default.aspx?hdRegion=124",
                  "https://www.miemssalert.com/chats/Default.aspx?hdRegion=5"]
+    print(f"Variables completed.")
 
     # ASSERT STATEMENTS
     assert os.path.exists(config_file_path)
+    print(f"Assertion tests completed.")
 
     # FUNCTIONS
     def create_database_connection_string(db_name: str, db_user: str, db_password: str) -> str:
@@ -130,6 +133,8 @@ def main():
         :return: datetime value
         """
         return datetime.now() - start
+
+    print(f"Functions completed.")
 
     # FUNCTIONALITY
     start = datetime.now()
