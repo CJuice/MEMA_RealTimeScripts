@@ -13,6 +13,9 @@ hospitals html table. Sometimes the html page contains the hospitals table but i
 failures every few hours due to these issues. On one run, a PROD task ran with issues and literally 2 seconds
 later an identical DEV task ran without issue, requesting from the same urls. Redesigned to have a while loop
 with three attempts each separated by a 5 second sleep. If don't succeed in three attempts then exit.
+20190405, CJuice: After a mistake in deploying where the database config file section was not switched from DEV to
+PROD, and the wrong database was being written to, I added a function to detect DEV or PROD in the script name and
+return the appropriate value based off of that naming convention.
 """
 
 
@@ -34,7 +37,6 @@ def main():
     _root_file_path = os.path.dirname(__file__)
     config_file = r"doit_config_HospitalStatus.cfg"
     config_file_path = os.path.join(_root_file_path, config_file)
-    database_cfg_section_name = "DATABASE_DEV"
     database_connection_string = "DSN={database_name};UID={database_user};PWD={database_password}"
     delay_seconds = 2
     html_id_hospital_table = "tblHospitals"
@@ -44,7 +46,7 @@ def main():
     sql_delete_insert_template = """DELETE FROM {table}; INSERT INTO {table} ({headers_joined}) VALUES """
     sql_values_statement = """({values})"""
     sql_values_statements_list = []
-    sql_values_string_template = """'{hospital}', '{status_level_value}', '{red_alert}','{yellow_alert}', '{mini_disaster}', '{reroute}', '{trauma_bypass}', '{created_date_string}'"""
+    sql_values_string_template = """'{hospital}', '{status_level_value}', '{yellow_alert}', '{red_alert}', '{mini_disaster}', '{reroute}', '{trauma_bypass}', '{created_date_string}'"""
     task_name = "HospitalStatus"
     urls_list = ["https://www.miemssalert.com/chats/Default.aspx?hdRegion=3",
                  "https://www.miemssalert.com/chats/Default.aspx?hdRegion=124",
@@ -71,6 +73,24 @@ def main():
         :return: string date & time
         """
         return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+    def determine_database_config_value_based_on_script_name() -> str:
+        """
+        Inspect the python script file name to see if it includes _DEV, _PROD, or neither and return appropriate value.
+        During redesign there was a DEV and PROD version and each wrote to a different database. When manually
+        deploying there was opportunity to error because the variable value had to be manually switched. Now all that
+        has to happen is the file name has to be switched and the correct config file section is accessed.
+        :return: string value for config file section to be accessed for database identity
+        """
+
+        file_name, extension = os.path.splitext(os.path.basename(__file__))
+        if "_DEV" in file_name:
+            return "DATABASE_DEV"
+        elif "_PROD" in file_name:
+            return "DATABASE_PROD"
+        else:
+            print(f"Script name does not contain _DEV or _PROD so proper Datbase config file section undetected")
+            exit()
 
     def determine_status_level(html_row_series: pd.Series):
         """
@@ -139,6 +159,9 @@ def main():
     # FUNCTIONALITY
     start = datetime.now()
     print(f"Process started: {start}")
+
+    # When using a DEV & PROD file during the redesign, avoid issues in using wrong database by inspecting script name.
+    database_cfg_section_name = determine_database_config_value_based_on_script_name()
 
     # need a current datetime stamp for database entry
     start_date_time = create_date_time_value_for_db()
@@ -222,8 +245,8 @@ def main():
             hospital, yellow_alert, red_alert, mini_disaster, reroute, trauma_bypass, *rest = row_series
             values = sql_values_string_template.format(hospital=hospital,
                                                        status_level_value=status_level_value,
-                                                       red_alert=red_alert,
                                                        yellow_alert=yellow_alert,
+                                                       red_alert=red_alert,
                                                        mini_disaster=mini_disaster,
                                                        reroute=reroute,
                                                        trauma_bypass=trauma_bypass,
