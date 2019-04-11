@@ -8,6 +8,7 @@ def main():
     from datetime import datetime
     from dateutil import parser as date_parser
     import configparser
+    from dataclasses import dataclass
     import numpy as np
     import os
     import pandas as pd
@@ -22,9 +23,11 @@ def main():
     config_file = r"doit_config_NOAACapAlerts.cfg"
     config_file_path = os.path.join(_root_file_path, config_file)
     database_connection_string = "DSN={database_name};UID={database_user};PWD={database_password}"
-    mdc_code_template = "MDC{fips_last_three}"
-    noaa_fips_values = [24001, 24003, 24005, 24510, 24009, 24011, 24013, 24015, 24017, 24019, 24021, 24023, 24025,
-                        24027, 24029, 24031, 24033, 24035, 24037, 24039, 24041, 24043, 24045, 24047]
+    # mdc_code_template = "MDC{fips_last_three}"
+    # noaa_fips_values = [24001, 24003, 24005, 24510, 24009, 24011, 24013, 24015, 24017, 24019, 24021, 24023, 24025,
+    #                     24027, 24029, 24031, 24033, 24035, 24037, 24039, 24041, 24043, 24045, 24047]
+    mdc_code_template = "ILC{fips_last_three}" # TESTING
+    noaa_fips_values = [17003, 17053, 17063, 17075] # TESTING
     noaa_url_template = r"""http://alerts.weather.gov/cap/wwaatmget.php?x={code}&y=0"""
 
     # ASSERTS
@@ -34,25 +37,24 @@ def main():
     # CLASSES
     @dataclass
     class CAPEntry:
-        title: str
-        link: str
-            "published": '',
-            "updated": '',
-            "summary": '',
-            "capevent": '',
-            "capeffective": '',
-            "capexpires": '',
-            "capstatus": '',
-            "capmsgType": '',
-            "capurgency": '',
-            "capseverity": '',
-            "capcertainty": '',
-            "capareaDesc": '',
-            "cappolygon": 'Null',
-            "fips": str(fips),
-            "DataGenerated": DataGenerated
+        cap_area_desc: str = np.NaN
+        cap_certainty: str = np.NaN
+        cap_effective: str = np.NaN
+        sum_event: str = np.NaN
+        cap_expires: str = np.NaN
+        cap_mary: str = np.NaN
+        cap_msg_type: str = np.NaN
+        cap_polygon: str = np.NaN
+        cap_severity: str = np.NaN
+        cap_status: str = np.NaN
+        cap_urgency: str = np.NaN
+        data_gen: datetime = np.NaN
+        fips: str = np.NaN
+        link: str = np.NaN
+        published: str = np.NaN
+        title: str = np.NaN
+        updated: str = np.NaN
 
-        }
     # FUNCTIONS
     def assemble_fips_to_mdccode_dict(url_template: str, mdc_code_template: str, fips_values: list) -> dict:
         """
@@ -218,17 +220,27 @@ def main():
     noaa_cap_alerts_urls_dict = assemble_fips_to_mdccode_dict(url_template=noaa_url_template,
                                                               mdc_code_template=mdc_code_template,
                                                               fips_values=noaa_fips_values)
+    def for_testing_write_xml_to_file(fips, text):
+        with open("test{fips}.txt".format(fips=fips), 'w') as handler:
+            handler.write(text)
+
 
     for fips, noaa_cap_alert_url in noaa_cap_alerts_urls_dict.items():
         response = requests.get(url=noaa_cap_alert_url)
+        # for_testing_write_xml_to_file(fips=fips, text=response.text)
         xml_response_root = parse_xml_response_to_element(response_xml_str=response.text)
-        entry_element = extract_first_immediate_child_feature_from_element(element=xml_response_root,
+        entry_element = extract_all_immediate_child_features_from_element(element=xml_response_root,
                                                                            tag_name="entry")
         doc_updated_element = extract_first_immediate_child_feature_from_element(element=xml_response_root,
                                                                                  tag_name="updated")
         date_updated = process_date_string(date_string=doc_updated_element.text)    # ignored time zone and dst etc conversions
-        title_text = extract_first_immediate_child_feature_from_element(element=entry_element, tag_name="title").text
-        if title_text == "There are no active watches, warnings or advisories":
+        for data in entry_element:
+            title_text = extract_first_immediate_child_feature_from_element(element=data, tag_name="title").text
+            print(title_text, "\n")
+            if title_text == "There are no active watches, warnings or advisories":
+                print("\t", title_text)
+                CAPEntry(data_gen=date_updated, fips=fips, title=title_text)
+                break
 
 
 if __name__ == "__main__":
