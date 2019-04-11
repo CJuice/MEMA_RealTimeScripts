@@ -6,6 +6,7 @@
 def main():
     # IMPORTS
     from datetime import datetime
+    from dateutil import parser as date_parser
     import configparser
     import numpy as np
     import os
@@ -13,6 +14,8 @@ def main():
     import pyodbc
     import requests
     import time
+    import xml.etree.ElementTree as ET
+    import dateutil
 
     # VARIABLES
     _root_file_path = os.path.dirname(__file__)
@@ -87,6 +90,49 @@ def main():
             print(f"Script name does not contain _DEV or _PROD so proper Database config file section undetected")
             exit()
 
+    def extract_first_immediate_child_feature_from_element(element: ET.Element, tag_name: str) -> ET.Element:
+        """Extract first immediate child feature from provided xml ET.Element based on provided tag name
+        All of the tags in the root element begin with the string '{http://www.w3.org/2005/Atom}'. Unable to find
+        the tag by it's name only. Chose to use a try with appended value and fail to
+        :param element: xml ET.Element to interrogate
+        :param tag_name: name of desired tag
+        :return: ET.Element of interest
+        """
+        try:
+            result = element.find(tag_name)
+        except AttributeError as ae:
+            print(f"AttributeError: Unable to extract '{tag_name}' from {element.text}: {ae}")
+            exit()
+        else:
+            if result is None:
+                # NOTE: The 'r' in front of the url is essential for this to work.
+                altered_tag_name = r"{http://www.w3.org/2005/Atom}" + tag_name
+                print(f"Altering...{altered_tag_name}")
+                return element.find(altered_tag_name)
+            else:
+                return result
+
+    def parse_xml_response_to_element(response_xml_str: str) -> ET.Element:
+        """
+        Process xml response content to xml ET.Element
+        :param response_xml_str: string xml from response
+        :return: xml ET.Element
+        """
+        try:
+            return ET.fromstring(response_xml_str)
+        except Exception as e:  # TODO: Improve exception handling
+            print(f"Unable to process xml response to Element using ET.fromstring(): {e}")
+            exit()
+
+    def process_date_string(date_string):
+        """
+        Parse the date string to datetime format using the dateutil parser and return string formatted
+        Old CGIS way was to manipulate string by removing a 'T' and doing other actions instead of using module
+        :param date_string: string extracted from response json
+        :return: date/time string formatted as indicated
+        """
+        return date_parser.parse(date_string).strftime('%Y-%m-%d %H:%M:%S')
+
     def setup_config(cfg_file: str) -> configparser.ConfigParser:
         """
         Instantiate the parser for accessing a config file.
@@ -127,7 +173,21 @@ def main():
 
     for fips, noaa_cap_alert_url in noaa_cap_alerts_urls_dict.items():
         response = requests.get(url=noaa_cap_alert_url)
-        print(response.status_code)
+        xml_response_root = parse_xml_response_to_element(response_xml_str=response.text)
+        entry_element = extract_first_immediate_child_feature_from_element(element=xml_response_root,
+                                                                           tag_name="entry")
+        doc_updated_element = extract_first_immediate_child_feature_from_element(element=xml_response_root,
+                                                                                 tag_name="updated")
+        date_updated = process_date_string(doc_updated_element.text)    # ignored time zone and dst etc conversions
+
+        title_text = extract_first_immediate_child_feature_from_element(element=entry_element, tag_name="title")
+        print(title_text.text)
+        # entry_element.find(r"{http://www.w3.org/2005/Atom}title")
+        # for element in entry_element:
+            # print(element.tag, element.attrib, element.text)
+            # if element.tag == "{http://www.w3.org/2005/Atom}title":
+            #     print(element.text)
+        exit()
 
 
 if __name__ == "__main__":
