@@ -89,7 +89,7 @@ def main():
         elif "_PROD" in file_name:
             return "DATABASE_PROD"
         else:
-            print(f"Script name does not contain _DEV or _PROD so proper Datbase config file section undetected")
+            print(f"Script name does not contain _DEV or _PROD so proper Database config file section undetected")
             exit()
 
     def determine_status_level(html_row_series: pd.Series):
