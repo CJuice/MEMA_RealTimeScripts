@@ -19,23 +19,40 @@ def main():
     config_file = r"doit_config_NOAACapAlerts.cfg"
     config_file_path = os.path.join(_root_file_path, config_file)
     database_connection_string = "DSN={database_name};UID={database_user};PWD={database_password}"
-    noaa_url_template = r"""http://alerts.weather.gov/cap/wwaatmget.php?x={code}&y=0"""
-    noaa_mdc_codes = ["MDC001", "MDC003", "MDC005", "MDC510", "MDC009", "MDC011", "MDC013", "MDC015", "MDC017",
-                      "MDC019", "MDC021", "MDC023", "MDC025", "MDC027", "MDC029", "MDC031", "MDC033", "MDC035",
-                      "MDC037", "MDC039", "MDC041", "MDC043", "MDC045", "MDC047"]
+    mdc_code_template = "MDC{fips_last_three}"
     noaa_fips_values = [24001, 24003, 24005, 24510, 24009, 24011, 24013, 24015, 24017, 24019, 24021, 24023, 24025,
                         24027, 24029, 24031, 24033, 24035, 24037, 24039, 24041, 24043, 24045, 24047]
-
-    new_list = []
-    for code in noaa_mdc_codes:
-        new_list.append(noaa_url_template.format(code=code))
+    noaa_url_template = r"""http://alerts.weather.gov/cap/wwaatmget.php?x={code}&y=0"""
 
     # ASSERTS
     assert os.path.exists(config_file_path)
     print(f"Assertion tests completed.")
 
     # CLASSES
+
     # FUNCTIONS
+    def assemble_fips_to_mdccode_dict(url_template: str, mdc_code_template: str, fips_values: list) -> dict:
+        """
+        Create NOAA Cap Alert urls from fips codes and return a dictionary of fips keys and url values.
+        A valid url uses an MDC code which appears to be the letters MDC and the last three numbers of a fips code.
+        The existing CGIS process contained a list of fips code that were taken to be those of interest to the process.
+        Each of the fips codes is converted to string, the last three digits are extracted, appended to the end of 'MDC'
+        and then substituted into a template url string. The fips code is then used as a dictionary key and the url
+        becomes the dictionary value. This dictionary is returned for use.
+        :param url_template: string template for NOAA Cap Alerts urls
+        :param mdc_code_template: string template similar to 'MDC---' where the three dashes are to be numbers from fips
+        :param fips_values: list of fips values of interest for the process
+        :return: dictionary of string fips keys and NOAA Cap Alert url values
+        """
+        output_dict = {}
+        for value in fips_values:
+            value = str(value)
+            last_three = value[2:]
+            mdc_code = mdc_code_template.format(fips_last_three=last_three)
+            full_url = url_template.format(code=mdc_code)
+            output_dict[value] = full_url
+        return output_dict
+
     def create_database_connection_string(db_name: str, db_user: str, db_password: str) -> str:
         """
         Create the connection string for accessing database and return.
@@ -95,6 +112,7 @@ def main():
     # When using a DEV & PROD file during the redesign, avoid issues in using wrong database by inspecting script name.
     # FIXME: CHANGE OUT FOR SERVER ENVIRONMENT
     # database_cfg_section_name = determine_database_config_value_based_on_script_name()
+    print("Using hardcoded database environment variable !!!!!!!!!!!!!!!!!!!!!!!!")
     database_cfg_section_name = "DATABASE_DEV"
 
     # need a current datetime stamp for database entry
@@ -103,7 +121,13 @@ def main():
     # need parser to access credentials
     config_parser = setup_config(config_file_path)
 
-    return
+    noaa_cap_alerts_urls_dict = assemble_fips_to_mdccode_dict(url_template=noaa_url_template,
+                                                              mdc_code_template=mdc_code_template,
+                                                              fips_values=noaa_fips_values)
+
+    for fips, noaa_cap_alert_url in noaa_cap_alerts_urls_dict.items():
+        response = requests.get(url=noaa_cap_alert_url)
+        print(response.status_code)
 
 
 if __name__ == "__main__":
