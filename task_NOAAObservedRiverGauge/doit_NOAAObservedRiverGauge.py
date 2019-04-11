@@ -29,7 +29,6 @@ def main():
     _root_file_path = os.path.dirname(__file__)
     config_file = r"doit_config_NOAAObservedRiverGauge.cfg"
     config_file_path = os.path.join(_root_file_path, config_file)
-    database_cfg_section_name = "DATABASE_DEV"
     database_connection_string = "DSN={database_name};UID={database_user};PWD={database_password}"
     gauge_objects_list = []
     noaa_query_payload = {"where": "state = 'MD'",
@@ -88,6 +87,24 @@ def main():
             print(f"Gauge {gauge_obj.gaugelid} {gauge_obj.location} date value was invalid {gauge_obj.data_gen} -> {converted}")
         return str(converted)
 
+    def determine_database_config_value_based_on_script_name() -> str:
+        """
+        Inspect the python script file name to see if it includes _DEV, _PROD, or neither and return appropriate value.
+        During redesign there was a DEV and PROD version and each wrote to a different database. When manually
+        deploying there was opportunity to error because the variable value had to be manually switched. Now all that
+        has to happen is the file name has to be switched and the correct config file section is accessed.
+        :return: string value for config file section to be accessed for database identity
+        """
+
+        file_name, extension = os.path.splitext(os.path.basename(__file__))
+        if "_DEV" in file_name:
+            return "DATABASE_DEV"
+        elif "_PROD" in file_name:
+            return "DATABASE_PROD"
+        else:
+            print(f"Script name does not contain _DEV or _PROD so proper Datbase config file section undetected")
+            exit()
+
     def setup_config(cfg_file: str) -> configparser.ConfigParser:
         """
         Instantiate the parser for accessing a config file.
@@ -110,6 +127,9 @@ def main():
     # need a current datetime stamp for process printout
     start = datetime.now()
     print(f"Process started: {start}")
+
+    # When using a DEV & PROD file during the redesign, avoid issues in using wrong database by inspecting script name.
+    database_cfg_section_name = determine_database_config_value_based_on_script_name()
 
     # need a current datetime stamp for database entry
     start_date_time = create_date_time_value_for_db()

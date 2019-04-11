@@ -32,7 +32,6 @@ def main():
     _root_file_path = os.path.dirname(__file__)
     config_file = r"doit_config_USGSStreamGauge.cfg"
     config_file_path = os.path.join(_root_file_path, config_file)
-    database_cfg_section_name = "DATABASE_DEV"
     database_connection_string = "DSN={database_name};UID={database_user};PWD={database_password}"
     gauge_objects_list = []
     realtime_usgsstreamgauge_tbl = "[{database_name}].[dbo].[RealTime_USGSStreamGages]"
@@ -85,20 +84,23 @@ def main():
         """
         return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-    def determine_gauge_height_value(variable_code, variable_value) -> float:
+    def determine_database_config_value_based_on_script_name() -> str:
         """
-        Determine the gauge height value based on the variable code and value values.
-        This was inherited logic from the old CGIS code. There were no notes on the basis of this design so the
-        design was brought into the new flow for consistency.
-        :param variable_code: value from response JSON
-        :param variable_value: value from response JSON
-        :return: float
+        Inspect the python script file name to see if it includes _DEV, _PROD, or neither and return appropriate value.
+        During redesign there was a DEV and PROD version and each wrote to a different database. When manually
+        deploying there was opportunity to error because the variable value had to be manually switched. Now all that
+        has to happen is the file name has to be switched and the correct config file section is accessed.
+        :return: string value for config file section to be accessed for database identity
         """
-        if variable_code == "00060":
-            return -9999
-        if pd.isnull(variable_value):
-            return -9999
-        return float(variable_value)
+
+        file_name, extension = os.path.splitext(os.path.basename(__file__))
+        if "_DEV" in file_name:
+            return "DATABASE_DEV"
+        elif "_PROD" in file_name:
+            return "DATABASE_PROD"
+        else:
+            print(f"Script name does not contain _DEV or _PROD so proper Datbase config file section undetected")
+            exit()
 
     def determine_discharge_value(variable_code, variable_value) -> float:
         """
@@ -115,6 +117,21 @@ def main():
             return -9999
         return float(variable_value)
 
+    def determine_gauge_height_value(variable_code, variable_value) -> float:
+        """
+        Determine the gauge height value based on the variable code and value values.
+        This was inherited logic from the old CGIS code. There were no notes on the basis of this design so the
+        design was brought into the new flow for consistency.
+        :param variable_code: value from response JSON
+        :param variable_value: value from response JSON
+        :return: float
+        """
+        if variable_code == "00060":
+            return -9999
+        if pd.isnull(variable_value):
+            return -9999
+        return float(variable_value)
+
     def extract_collected_date(second_level_json):
         """
         Extract the value associated with the 'dateTime' key in the json
@@ -125,6 +142,36 @@ def main():
             return second_level_json.get("dateTime", np.NaN)
         except Exception as e:
             print(f"extract_collected_date(): {e}")
+            return np.NaN
+
+    def extract_data_generated_value(value_json):
+        """
+        Extract the data generated value from the response json
+        :param value_json: json from 'value' key in response json
+        :return: value or numpy nan
+        """
+        try:
+            result1 = value_json.get("queryInfo", {})
+            result2 = result1.get("note", [])
+            result3 = result2[3]
+            return result3.get("value", np.NaN)
+        except Exception as e:
+            print(f"extract_data_generated_value(): {e}")
+            return np.NaN
+
+    def extract_second_level_values(gauge_json):
+        """
+        Multiple extractions of keys and values from gauge json object to get second level values for further use
+        :param gauge_json: gauge json object from the time series json
+        :return: value or numpy nan
+        """
+        try:
+            result1 = gauge_json.get("values", [])
+            result2 = result1[0]
+            result3 = result2.get("value", [])
+            return result3[0]
+        except Exception as e:
+            print(f"extract_second_level_values(): {e}")
             return np.NaN
 
     def extract_site_code(source_info_json):
@@ -192,36 +239,6 @@ def main():
             print(f"extract_variable_value(): {e}")
             return np.NaN
 
-    def extract_second_level_values(gauge_json):
-        """
-        Multiple extractions of keys and values from gauge json object to get second level values for further use
-        :param gauge_json: gauge json object from the time series json
-        :return: value or numpy nan
-        """
-        try:
-            result1 = gauge_json.get("values", [])
-            result2 = result1[0]
-            result3 = result2.get("value", [])
-            return result3[0]
-        except Exception as e:
-            print(f"extract_second_level_values(): {e}")
-            return np.NaN
-
-    def extract_data_generated_value(value_json):
-        """
-        Extract the data generated value from the response json
-        :param value_json: json from 'value' key in response json
-        :return: value or numpy nan
-        """
-        try:
-            result1 = value_json.get("queryInfo",{})
-            result2 = result1.get("note", [])
-            result3 = result2[3]
-            return result3.get("value", np.NaN)
-        except Exception as e:
-            print(f"extract_data_generated_value(): {e}")
-            return np.NaN
-
     def process_date_string(date_string):
         """
         Parse the date string to datetime format using the dateutil parser and return string formatted
@@ -279,6 +296,9 @@ def main():
     # FUNCTIONALITY
     start = datetime.now()
     print(f"Process started: {start}")
+
+    # When using a DEV & PROD file during the redesign, avoid issues in using wrong database by inspecting script name.
+    database_cfg_section_name = determine_database_config_value_based_on_script_name()
 
     # need a current datetime stamp for database entry
     start_date_time = create_date_time_value_for_db()
