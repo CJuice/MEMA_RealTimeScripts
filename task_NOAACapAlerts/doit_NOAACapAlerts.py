@@ -19,6 +19,16 @@ def main():
     config_file = r"doit_config_NOAACapAlerts.cfg"
     config_file_path = os.path.join(_root_file_path, config_file)
     database_connection_string = "DSN={database_name};UID={database_user};PWD={database_password}"
+    noaa_url_template = r"""http://alerts.weather.gov/cap/wwaatmget.php?x={code}&y=0"""
+    noaa_mdc_codes = ["MDC001", "MDC003", "MDC005", "MDC510", "MDC009", "MDC011", "MDC013", "MDC015", "MDC017",
+                      "MDC019", "MDC021", "MDC023", "MDC025", "MDC027", "MDC029", "MDC031", "MDC033", "MDC035",
+                      "MDC037", "MDC039", "MDC041", "MDC043", "MDC045", "MDC047"]
+    noaa_fips_values = [24001, 24003, 24005, 24510, 24009, 24011, 24013, 24015, 24017, 24019, 24021, 24023, 24025,
+                        24027, 24029, 24031, 24033, 24035, 24037, 24039, 24041, 24043, 24045, 24047]
+
+    new_list = []
+    for code in noaa_mdc_codes:
+        new_list.append(noaa_url_template.format(code=code))
 
     # ASSERTS
     assert os.path.exists(config_file_path)
@@ -57,7 +67,7 @@ def main():
         elif "_PROD" in file_name:
             return "DATABASE_PROD"
         else:
-            print(f"Script name does not contain _DEV or _PROD so proper Datbase config file section undetected")
+            print(f"Script name does not contain _DEV or _PROD so proper Database config file section undetected")
             exit()
 
     def setup_config(cfg_file: str) -> configparser.ConfigParser:
@@ -83,7 +93,9 @@ def main():
     print(f"Process started: {start}")
 
     # When using a DEV & PROD file during the redesign, avoid issues in using wrong database by inspecting script name.
-    database_cfg_section_name = determine_database_config_value_based_on_script_name()
+    # FIXME: CHANGE OUT FOR SERVER ENVIRONMENT
+    # database_cfg_section_name = determine_database_config_value_based_on_script_name()
+    database_cfg_section_name = "DATABASE_DEV"
 
     # need a current datetime stamp for database entry
     start_date_time = create_date_time_value_for_db()
