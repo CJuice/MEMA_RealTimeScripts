@@ -32,7 +32,27 @@ def main():
     print(f"Assertion tests completed.")
 
     # CLASSES
+    @dataclass
+    class CAPEntry:
+        title: str
+        link: str
+            "published": '',
+            "updated": '',
+            "summary": '',
+            "capevent": '',
+            "capeffective": '',
+            "capexpires": '',
+            "capstatus": '',
+            "capmsgType": '',
+            "capurgency": '',
+            "capseverity": '',
+            "capcertainty": '',
+            "capareaDesc": '',
+            "cappolygon": 'Null',
+            "fips": str(fips),
+            "DataGenerated": DataGenerated
 
+        }
     # FUNCTIONS
     def assemble_fips_to_mdccode_dict(url_template: str, mdc_code_template: str, fips_values: list) -> dict:
         """
@@ -89,6 +109,34 @@ def main():
         else:
             print(f"Script name does not contain _DEV or _PROD so proper Database config file section undetected")
             exit()
+
+    def extract_all_immediate_child_features_from_element(element: ET.Element, tag_name: str) -> list:
+        """
+        Extract all immediate children of the element provided to the method.
+
+        :param element: ET.Element of interest to be interrogated
+        :param tag_name: tag of interest on which to search
+        :return: list of all discovered ET.Element items
+        """
+        try:
+            result = element.findall(tag_name)
+        except AttributeError as ae:
+            print(f"AttributeError: Unable to extract '{tag_name}' from {element.text}: {ae}")
+            exit()
+        else:
+            if len(result) == 0:
+                # NOTE: The 'r' in front of the url is essential for this to work.
+                altered_tag_name = r"{http://www.w3.org/2005/Atom}" + tag_name
+                print(f"Altering...{altered_tag_name}")
+                return element.findall(altered_tag_name)
+            else:
+                return result
+
+        # try:
+        #     return element.findall(tag_name)
+        # except AttributeError as ae:
+        #     print(f"AttributeError: Unable to extract '{tag_name}' from {element.text}: {ae}")
+        #     exit()
 
     def extract_first_immediate_child_feature_from_element(element: ET.Element, tag_name: str) -> ET.Element:
         """Extract first immediate child feature from provided xml ET.Element based on provided tag name
@@ -178,16 +226,9 @@ def main():
                                                                            tag_name="entry")
         doc_updated_element = extract_first_immediate_child_feature_from_element(element=xml_response_root,
                                                                                  tag_name="updated")
-        date_updated = process_date_string(doc_updated_element.text)    # ignored time zone and dst etc conversions
-
-        title_text = extract_first_immediate_child_feature_from_element(element=entry_element, tag_name="title")
-        print(title_text.text)
-        # entry_element.find(r"{http://www.w3.org/2005/Atom}title")
-        # for element in entry_element:
-            # print(element.tag, element.attrib, element.text)
-            # if element.tag == "{http://www.w3.org/2005/Atom}title":
-            #     print(element.text)
-        exit()
+        date_updated = process_date_string(date_string=doc_updated_element.text)    # ignored time zone and dst etc conversions
+        title_text = extract_first_immediate_child_feature_from_element(element=entry_element, tag_name="title").text
+        if title_text == "There are no active watches, warnings or advisories":
 
 
 if __name__ == "__main__":
