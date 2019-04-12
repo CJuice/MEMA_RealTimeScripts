@@ -332,6 +332,32 @@ def main():
                     xml_extraction_func=extract_first_immediate_child_feature_from_element,
                     element=data,
                     tag_name="areaDesc").text
+                polygon_elem = handle_tag_name_excess(
+                    xml_extraction_func=extract_first_immediate_child_feature_from_element,
+                    element=data,
+                    tag_name="polygon")
+
+                def process_polygon_elem_result(poly_elem):
+                    if poly_elem is None:
+                        return np.NaN
+                    else:
+                        # if present, comes in as text like this
+                        # '37.23,-89.59 37.25,-89.41 37.13,-89.29 37.09,-89.46 37.23,-89.59'
+                        # CGIS code note said the following:
+                        # need to convert polygon list to WKT and reverse lat long (CGIS)
+                        # WKT is Well Known Text, has to do with databse representation of coordinate reference systems
+                        values = poly_elem.text
+                        coord_pairs_list = values.split(" ")
+                        coord_pairs_list_switched = [f"""{value.split(',')[1]} {value.split(',')[0]}""" for value in coord_pairs_list]
+                        coords_for_database_use = ",".join(coord_pairs_list_switched)
+                        result = """geometry::STGeomFromText('POLYGON(({coords_joined}))', 4326)""".format(
+                            coords_joined=coords_for_database_use)
+                        return result
+
+                print(process_polygon_elem_result(poly_elem=polygon_elem))
+                exit()
+                # TODO: Stopped. Just finished polishing the process polygons function. Was working on reproducing CGIS Transforms
+                #   TODO: functionality. Believe next step is to build objects and store.
                 # print(link)
                 # print(published_processed)
                 # print(updated)
@@ -347,7 +373,7 @@ def main():
                 # print(cap_area_desc)
                 # print()
 
-                
+
 
 
 if __name__ == "__main__":
