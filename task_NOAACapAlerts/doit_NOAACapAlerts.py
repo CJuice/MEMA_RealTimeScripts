@@ -21,8 +21,6 @@ def main():
 
     # VARIABLES
     _root_file_path = os.path.dirname(__file__)
-    appended_unnecessary_url = r"{http://www.w3.org/2005/Atom}"
-    appended_unnecessary_strings = r""
     config_file = r"doit_config_NOAACapAlerts.cfg"
     config_file_path = os.path.join(_root_file_path, config_file)
     database_connection_string = "DSN={database_name};UID={database_user};PWD={database_password}"
@@ -129,13 +127,15 @@ def main():
             print(f"AttributeError: Unable to extract '{tag_name}' from {element.text}: {ae}")
             exit()
         else:
-            if len(result) == 0:
-                # NOTE: The 'r' in front of the url is essential for this to work.
-                altered_tag_name = appended_unnecessary_url + tag_name
-                # print(f"Altering...{altered_tag_name}")
-                return element.findall(altered_tag_name)
-            else:
-                return result
+            return result
+        # else:
+        #     if len(result) == 0:
+        #         # NOTE: The 'r' in front of the url is essential for this to work.
+        #         altered_tag_name = appended_unnecessary_url + tag_name
+        #         # print(f"Altering...{altered_tag_name}")
+        #         return element.findall(altered_tag_name)
+        #     else:
+        #         return result
 
         # try:
         #     return element.findall(tag_name)
@@ -157,13 +157,15 @@ def main():
             print(f"AttributeError: Unable to extract '{tag_name}' from {element.text}: {ae}")
             exit()
         else:
-            if result is None:
-                # NOTE: The 'r' in front of the url is essential for this to work.
-                altered_tag_name = appended_unnecessary_url + tag_name
-                # print(f"Altering...{altered_tag_name}")
-                return element.find(altered_tag_name)
-            else:
-                return result
+            return result
+        # else:
+        #     if result is None:
+        #         # NOTE: The 'r' in front of the url is essential for this to work.
+        #         altered_tag_name = appended_unnecessary_url + tag_name
+        #         # print(f"Altering...{altered_tag_name}")
+        #         return element.find(altered_tag_name)
+        #     else:
+        #         return result
 
     def for_testing_write_xml_to_file(fips, text):
         with open("test{fips}.txt".format(fips=fips), 'w') as handler:
@@ -184,7 +186,7 @@ def main():
         for item in element:
             result = re.search(pattern=re_pattern, string=item.tag)
             if result:
-                return xml_extraction_func(element=element, tag_name=tag_name)
+                return xml_extraction_func(element=element, tag_name=item.tag)
             else:
                 continue
         return None
@@ -271,44 +273,70 @@ def main():
             title_text = handle_tag_name_excess(xml_extraction_func=extract_first_immediate_child_feature_from_element,
                                                 element=data,
                                                 tag_name="title").text
-            print(fips, title_text)
-            continue
+            # print(fips, title_text)
             if title_text == "There are no active watches, warnings or advisories":
                 alert_objects.append(CAPEntry(data_gen=date_updated, fips=fips, title=title_text))
                 print(title_text)
                 break
             else:
-                for feature in data:
-                    print(feature.tag, feature.attrib, feature.text)
-                continue
-                link = extract_first_immediate_child_feature_from_element(element=data,
-                                                                          tag_name="link").attrib.get("href", np.NaN)
-                published = extract_first_immediate_child_feature_from_element(element=data, tag_name="published").text
+                # for feature in data:
+                #     print(feature.tag, feature.attrib, feature.text)
+                # continue
+                link = handle_tag_name_excess(xml_extraction_func=extract_first_immediate_child_feature_from_element,
+                                              element=data,
+                                              tag_name="link").attrib.get("href", np.NaN)
+                published = handle_tag_name_excess(
+                    xml_extraction_func=extract_first_immediate_child_feature_from_element,
+                    element=data,
+                    tag_name="published").text
                 published_processed = str(date_parser.parse(published))
-                updated = extract_first_immediate_child_feature_from_element(element=data, tag_name="updated").text
-                summary = extract_first_immediate_child_feature_from_element(element=data, tag_name="summary").text
-                cap_event = extract_first_immediate_child_feature_from_element(element=data, tag_name="cap:event").text
-                # cap_effective = extract_first_immediate_child_feature_from_element(element=data,
-                #                                                                    tag_name="cap:effective").text
-                # cap_expires = extract_first_immediate_child_feature_from_element(element=data,
-                #                                                                  tag_name="cap_expires").text
-                # cap_status = extract_first_immediate_child_feature_from_element(element=data,
-                #                                                                 tag_name="cap_status").text
-                # cap_msg_type = extract_first_immediate_child_feature_from_element(element=data,
-                #                                                                   tag_name="cap:msgType").text
-                # cap_urgency = extract_first_immediate_child_feature_from_element(element=data,
-                #                                                                 tag_name="cap:urgency").text
-                # cap_severity = extract_first_immediate_child_feature_from_element(element=data,
-                #                                                                 tag_name="cap:severity").text
-                # cap_certainty = extract_first_immediate_child_feature_from_element(element=data,
-                #                                                                 tag_name="cap:certainty").text
-                # cap_area_desc = extract_first_immediate_child_feature_from_element(element=data,
-                #                                                                 tag_name="cap:areaDesc").text
-                print(link)
-                print(published_processed)
-                print(updated)
-                print(summary)
-                print(cap_event)
+                updated = handle_tag_name_excess(xml_extraction_func=extract_first_immediate_child_feature_from_element,
+                                                 element=data,
+                                                 tag_name="updated").text
+                summary = handle_tag_name_excess(xml_extraction_func=extract_first_immediate_child_feature_from_element,
+                                                 element=data,
+                                                 tag_name="summary").text
+                cap_event = handle_tag_name_excess(
+                    xml_extraction_func=extract_first_immediate_child_feature_from_element,
+                    element=data,
+                    tag_name="event").text
+                cap_effective = handle_tag_name_excess(
+                    xml_extraction_func=extract_first_immediate_child_feature_from_element,
+                    element=data,
+                    tag_name="effective").text
+                cap_expires = handle_tag_name_excess(
+                    xml_extraction_func=extract_first_immediate_child_feature_from_element,
+                    element=data,
+                    tag_name="expires").text
+                cap_status = handle_tag_name_excess(
+                    xml_extraction_func=extract_first_immediate_child_feature_from_element,
+                    element=data,
+                    tag_name="status").text
+                cap_msg_type = handle_tag_name_excess(
+                    xml_extraction_func=extract_first_immediate_child_feature_from_element,
+                    element=data,
+                    tag_name="msgType").text
+                cap_urgency = handle_tag_name_excess(
+                    xml_extraction_func=extract_first_immediate_child_feature_from_element,
+                    element=data,
+                    tag_name="urgency").text
+                cap_severity = handle_tag_name_excess(
+                    xml_extraction_func=extract_first_immediate_child_feature_from_element,
+                    element=data,
+                    tag_name="severity").text
+                cap_certainty = handle_tag_name_excess(
+                    xml_extraction_func=extract_first_immediate_child_feature_from_element,
+                    element=data,
+                    tag_name="certainty").text
+                cap_area_desc = handle_tag_name_excess(
+                    xml_extraction_func=extract_first_immediate_child_feature_from_element,
+                    element=data,
+                    tag_name="areaDesc").text
+                # print(link)
+                # print(published_processed)
+                # print(updated)
+                # print(summary)
+                # print(cap_event)
                 # print(cap_effective)
                 # print(cap_expires)
                 # print(cap_status)
@@ -317,7 +345,10 @@ def main():
                 # print(cap_severity)
                 # print(cap_certainty)
                 # print(cap_area_desc)
-                print()
+                # print()
+
+                
+
 
 if __name__ == "__main__":
     main()
