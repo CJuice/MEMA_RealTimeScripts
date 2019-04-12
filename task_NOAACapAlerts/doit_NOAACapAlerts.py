@@ -13,6 +13,7 @@ def main():
     import os
     import pandas as pd
     import pyodbc
+    import re
     import requests
     import time
     import xml.etree.ElementTree as ET
@@ -20,14 +21,16 @@ def main():
 
     # VARIABLES
     _root_file_path = os.path.dirname(__file__)
+    appended_unnecessary_url = r"{http://www.w3.org/2005/Atom}"
+    appended_unnecessary_strings = r""
     config_file = r"doit_config_NOAACapAlerts.cfg"
     config_file_path = os.path.join(_root_file_path, config_file)
     database_connection_string = "DSN={database_name};UID={database_user};PWD={database_password}"
     # mdc_code_template = "MDC{fips_last_three}"
     # noaa_fips_values = [24001, 24003, 24005, 24510, 24009, 24011, 24013, 24015, 24017, 24019, 24021, 24023, 24025,
     #                     24027, 24029, 24031, 24033, 24035, 24037, 24039, 24041, 24043, 24045, 24047]
-    mdc_code_template = "ILC{fips_last_three}" # TESTING
-    noaa_fips_values = [17003, 17053, 17063, 17075] # TESTING
+    mdc_code_template = "ILC{fips_last_three}"  # TESTING
+    noaa_fips_values = [17003, 17053, 17063, 17075]  # TESTING
     noaa_url_template = r"""http://alerts.weather.gov/cap/wwaatmget.php?x={code}&y=0"""
 
     # ASSERTS
@@ -128,8 +131,8 @@ def main():
         else:
             if len(result) == 0:
                 # NOTE: The 'r' in front of the url is essential for this to work.
-                altered_tag_name = r"{http://www.w3.org/2005/Atom}" + tag_name
-                print(f"Altering...{altered_tag_name}")
+                altered_tag_name = appended_unnecessary_url + tag_name
+                # print(f"Altering...{altered_tag_name}")
                 return element.findall(altered_tag_name)
             else:
                 return result
@@ -143,7 +146,7 @@ def main():
     def extract_first_immediate_child_feature_from_element(element: ET.Element, tag_name: str) -> ET.Element:
         """Extract first immediate child feature from provided xml ET.Element based on provided tag name
         All of the tags in the root element begin with the string '{http://www.w3.org/2005/Atom}'. Unable to find
-        the tag by it's name only. Chose to use a try with appended value and fail to
+        the tag by it's name only. Chose to use a try with tag name and then fail to appended value
         :param element: xml ET.Element to interrogate
         :param tag_name: name of desired tag
         :return: ET.Element of interest
@@ -156,11 +159,35 @@ def main():
         else:
             if result is None:
                 # NOTE: The 'r' in front of the url is essential for this to work.
-                altered_tag_name = r"{http://www.w3.org/2005/Atom}" + tag_name
-                print(f"Altering...{altered_tag_name}")
+                altered_tag_name = appended_unnecessary_url + tag_name
+                # print(f"Altering...{altered_tag_name}")
                 return element.find(altered_tag_name)
             else:
                 return result
+
+    def for_testing_write_xml_to_file(fips, text):
+        with open("test{fips}.txt".format(fips=fips), 'w') as handler:
+            handler.write(text)
+
+    def handle_tag_name_excess(xml_extraction_func, element: ET.Element, tag_name: str):
+        """
+        Use regular expressions to search tag names, containing prepended junk, for desired value at end of tag string.
+        A decorator was not used because I had control over the original function and wasn't working with a
+        pre-existing function whose behavior I could not alter. I thought the decorator would be less obvious.
+
+        :param xml_extraction_func: doit xml extraction function needed for current tag name search
+        :param element: xml element
+        :param tag_name: string tag name being sought
+        :return: None or value that extraction func returns
+        """
+        re_pattern = f"{tag_name}$"
+        for item in element:
+            result = re.search(pattern=re_pattern, string=item.tag)
+            if result:
+                return xml_extraction_func(element=element, tag_name=tag_name)
+            else:
+                continue
+        return None
 
     def parse_xml_response_to_element(response_xml_str: str) -> ET.Element:
         """
@@ -220,28 +247,77 @@ def main():
     noaa_cap_alerts_urls_dict = assemble_fips_to_mdccode_dict(url_template=noaa_url_template,
                                                               mdc_code_template=mdc_code_template,
                                                               fips_values=noaa_fips_values)
-    def for_testing_write_xml_to_file(fips, text):
-        with open("test{fips}.txt".format(fips=fips), 'w') as handler:
-            handler.write(text)
-
 
     for fips, noaa_cap_alert_url in noaa_cap_alerts_urls_dict.items():
         response = requests.get(url=noaa_cap_alert_url)
-        # for_testing_write_xml_to_file(fips=fips, text=response.text)
-        xml_response_root = parse_xml_response_to_element(response_xml_str=response.text)
-        entry_element = extract_all_immediate_child_features_from_element(element=xml_response_root,
-                                                                           tag_name="entry")
-        doc_updated_element = extract_first_immediate_child_feature_from_element(element=xml_response_root,
-                                                                                 tag_name="updated")
-        date_updated = process_date_string(date_string=doc_updated_element.text)    # ignored time zone and dst etc conversions
-        for data in entry_element:
-            title_text = extract_first_immediate_child_feature_from_element(element=data, tag_name="title").text
-            print(title_text, "\n")
-            if title_text == "There are no active watches, warnings or advisories":
-                print("\t", title_text)
-                CAPEntry(data_gen=date_updated, fips=fips, title=title_text)
-                break
 
+        # for_testing_write_xml_to_file(fips=fips, text=response.text) # TESTING
+
+        xml_response_root = parse_xml_response_to_element(response_xml_str=response.text)
+        entry_element = handle_tag_name_excess(xml_extraction_func=extract_all_immediate_child_features_from_element,
+                                               element=xml_response_root,
+                                               tag_name="entry")
+        doc_updated_element = handle_tag_name_excess(
+            xml_extraction_func=extract_first_immediate_child_feature_from_element,
+            element=xml_response_root,
+            tag_name="updated")
+
+        # ignored time zone and dst etc conversions at this time
+        date_updated = process_date_string(date_string=doc_updated_element.text)
+
+        # continue
+        alert_objects = []
+        for data in entry_element:
+            title_text = handle_tag_name_excess(xml_extraction_func=extract_first_immediate_child_feature_from_element,
+                                                element=data,
+                                                tag_name="title").text
+            print(fips, title_text)
+            continue
+            if title_text == "There are no active watches, warnings or advisories":
+                alert_objects.append(CAPEntry(data_gen=date_updated, fips=fips, title=title_text))
+                print(title_text)
+                break
+            else:
+                for feature in data:
+                    print(feature.tag, feature.attrib, feature.text)
+                continue
+                link = extract_first_immediate_child_feature_from_element(element=data,
+                                                                          tag_name="link").attrib.get("href", np.NaN)
+                published = extract_first_immediate_child_feature_from_element(element=data, tag_name="published").text
+                published_processed = str(date_parser.parse(published))
+                updated = extract_first_immediate_child_feature_from_element(element=data, tag_name="updated").text
+                summary = extract_first_immediate_child_feature_from_element(element=data, tag_name="summary").text
+                cap_event = extract_first_immediate_child_feature_from_element(element=data, tag_name="cap:event").text
+                # cap_effective = extract_first_immediate_child_feature_from_element(element=data,
+                #                                                                    tag_name="cap:effective").text
+                # cap_expires = extract_first_immediate_child_feature_from_element(element=data,
+                #                                                                  tag_name="cap_expires").text
+                # cap_status = extract_first_immediate_child_feature_from_element(element=data,
+                #                                                                 tag_name="cap_status").text
+                # cap_msg_type = extract_first_immediate_child_feature_from_element(element=data,
+                #                                                                   tag_name="cap:msgType").text
+                # cap_urgency = extract_first_immediate_child_feature_from_element(element=data,
+                #                                                                 tag_name="cap:urgency").text
+                # cap_severity = extract_first_immediate_child_feature_from_element(element=data,
+                #                                                                 tag_name="cap:severity").text
+                # cap_certainty = extract_first_immediate_child_feature_from_element(element=data,
+                #                                                                 tag_name="cap:certainty").text
+                # cap_area_desc = extract_first_immediate_child_feature_from_element(element=data,
+                #                                                                 tag_name="cap:areaDesc").text
+                print(link)
+                print(published_processed)
+                print(updated)
+                print(summary)
+                print(cap_event)
+                # print(cap_effective)
+                # print(cap_expires)
+                # print(cap_status)
+                # print(cap_msg_type)
+                # print(cap_urgency)
+                # print(cap_severity)
+                # print(cap_certainty)
+                # print(cap_area_desc)
+                print()
 
 if __name__ == "__main__":
     main()
