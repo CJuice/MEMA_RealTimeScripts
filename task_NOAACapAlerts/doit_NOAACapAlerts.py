@@ -338,14 +338,19 @@ def main():
                     tag_name="polygon")
 
                 def process_polygon_elem_result(poly_elem):
+                    """
+                      TODO
+                      if present, comes in as text like this
+                      '37.23,-89.59 37.25,-89.41 37.13,-89.29 37.09,-89.46 37.23,-89.59'
+                      CGIS code note said the following: need to convert polygon list to WKT and reverse lat long (CGIS)
+                      WKT appears to be "Well Known Text", has to do with database representation of coordinate
+                      reference systems
+                    :param poly_elem:
+                    :return:
+                    """
                     if poly_elem is None:
                         return np.NaN
                     else:
-                        # if present, comes in as text like this
-                        # '37.23,-89.59 37.25,-89.41 37.13,-89.29 37.09,-89.46 37.23,-89.59'
-                        # CGIS code note said the following:
-                        # need to convert polygon list to WKT and reverse lat long (CGIS)
-                        # WKT is Well Known Text, has to do with databse representation of coordinate reference systems
                         values = poly_elem.text
                         coord_pairs_list = values.split(" ")
                         coord_pairs_list_switched = [f"""{value.split(',')[1]} {value.split(',')[0]}""" for value in coord_pairs_list]
