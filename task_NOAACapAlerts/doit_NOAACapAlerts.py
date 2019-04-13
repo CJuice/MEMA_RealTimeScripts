@@ -41,9 +41,8 @@ def main():
         cap_area_desc: str = np.NaN
         cap_certainty: str = np.NaN
         cap_effective: str = np.NaN
-        sum_event: str = np.NaN
+        cap_event: str = np.NaN
         cap_expires: str = np.NaN
-        cap_mary: str = np.NaN
         cap_msg_type: str = np.NaN
         cap_polygon: str = np.NaN
         cap_severity: str = np.NaN
@@ -53,6 +52,7 @@ def main():
         fips: str = np.NaN
         link: str = np.NaN
         published: str = np.NaN
+        summary: str = np.NaN
         title: str = np.NaN
         updated: str = np.NaN
 
@@ -212,6 +212,29 @@ def main():
         """
         return date_parser.parse(date_string).strftime('%Y-%m-%d %H:%M:%S')
 
+    def process_polygon_elem_result(poly_elem):
+        """
+          TODO
+          if present, comes in as text like this
+          '37.23,-89.59 37.25,-89.41 37.13,-89.29 37.09,-89.46 37.23,-89.59'
+          CGIS code note said the following: need to convert polygon list to WKT and reverse lat long (CGIS)
+          WKT appears to be "Well Known Text", has to do with database representation of coordinate
+          reference systems
+        :param poly_elem: TODO
+        :return: TODO
+        """
+        if poly_elem is None:
+            return np.NaN
+        else:
+            values = poly_elem.text
+            coord_pairs_list = values.split(" ")
+            coord_pairs_list_switched = [f"""{value.split(',')[1]} {value.split(',')[0]}""" for value in
+                                         coord_pairs_list]
+            coords_for_database_use = ",".join(coord_pairs_list_switched)
+            result = """geometry::STGeomFromText('POLYGON(({coords_joined}))', 4326)""".format(
+                coords_joined=coords_for_database_use)
+            return result
+
     def setup_config(cfg_file: str) -> configparser.ConfigParser:
         """
         Instantiate the parser for accessing a config file.
@@ -249,7 +272,7 @@ def main():
     noaa_cap_alerts_urls_dict = assemble_fips_to_mdccode_dict(url_template=noaa_url_template,
                                                               mdc_code_template=mdc_code_template,
                                                               fips_values=noaa_fips_values)
-
+    alert_objects = []
     for fips, noaa_cap_alert_url in noaa_cap_alerts_urls_dict.items():
         response = requests.get(url=noaa_cap_alert_url)
 
@@ -268,7 +291,6 @@ def main():
         date_updated = process_date_string(date_string=doc_updated_element.text)
 
         # continue
-        alert_objects = []
         for data in entry_element:
             title_text = handle_tag_name_excess(xml_extraction_func=extract_first_immediate_child_feature_from_element,
                                                 element=data,
@@ -336,33 +358,25 @@ def main():
                     xml_extraction_func=extract_first_immediate_child_feature_from_element,
                     element=data,
                     tag_name="polygon")
-
-                def process_polygon_elem_result(poly_elem):
-                    """
-                      TODO
-                      if present, comes in as text like this
-                      '37.23,-89.59 37.25,-89.41 37.13,-89.29 37.09,-89.46 37.23,-89.59'
-                      CGIS code note said the following: need to convert polygon list to WKT and reverse lat long (CGIS)
-                      WKT appears to be "Well Known Text", has to do with database representation of coordinate
-                      reference systems
-                    :param poly_elem:
-                    :return:
-                    """
-                    if poly_elem is None:
-                        return np.NaN
-                    else:
-                        values = poly_elem.text
-                        coord_pairs_list = values.split(" ")
-                        coord_pairs_list_switched = [f"""{value.split(',')[1]} {value.split(',')[0]}""" for value in coord_pairs_list]
-                        coords_for_database_use = ",".join(coord_pairs_list_switched)
-                        result = """geometry::STGeomFromText('POLYGON(({coords_joined}))', 4326)""".format(
-                            coords_joined=coords_for_database_use)
-                        return result
-
-                print(process_polygon_elem_result(poly_elem=polygon_elem))
-                exit()
-                # TODO: Stopped. Just finished polishing the process polygons function. Was working on reproducing CGIS Transforms
-                #   TODO: functionality. Believe next step is to build objects and store.
+                cap_polygon = process_polygon_elem_result(poly_elem=polygon_elem)
+                alert_objects.append(CAPEntry(cap_area_desc=cap_area_desc,
+                                              cap_certainty=cap_certainty,
+                                              cap_effective=cap_effective,
+                                              cap_event=cap_event,
+                                              cap_expires=cap_expires,
+                                              cap_msg_type=cap_msg_type,
+                                              cap_polygon=cap_polygon,
+                                              cap_severity=cap_severity,
+                                              cap_status=cap_status,
+                                              cap_urgency=cap_urgency,
+                                              data_gen=date_updated,
+                                              fips=fips,
+                                              link=link,
+                                              published=published_processed,
+                                              summary=summary,
+                                              title=title_text,
+                                              updated=updated)
+                                     )
                 # print(link)
                 # print(published_processed)
                 # print(updated)
@@ -377,6 +391,7 @@ def main():
                 # print(cap_certainty)
                 # print(cap_area_desc)
                 # print()
+    print(alert_objects)
 
 
 
