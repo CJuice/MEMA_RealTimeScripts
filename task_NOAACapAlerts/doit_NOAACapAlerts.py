@@ -304,14 +304,17 @@ def main():
                 # for feature in data:
                 #     print(feature.tag, feature.attrib, feature.text)
                 # continue
+                # TODO: Reorder value extraction to match CAPAlert object order, which is alphabetical
                 link = handle_tag_name_excess(xml_extraction_func=extract_first_immediate_child_feature_from_element,
                                               element=data,
                                               tag_name="link").attrib.get("href", np.NaN)
+
                 published = handle_tag_name_excess(
                     xml_extraction_func=extract_first_immediate_child_feature_from_element,
                     element=data,
                     tag_name="published").text
                 published_processed = str(date_parser.parse(published))
+
                 updated = handle_tag_name_excess(xml_extraction_func=extract_first_immediate_child_feature_from_element,
                                                  element=data,
                                                  tag_name="updated").text
@@ -354,11 +357,13 @@ def main():
                     xml_extraction_func=extract_first_immediate_child_feature_from_element,
                     element=data,
                     tag_name="areaDesc").text
+
                 polygon_elem = handle_tag_name_excess(
                     xml_extraction_func=extract_first_immediate_child_feature_from_element,
                     element=data,
                     tag_name="polygon")
                 cap_polygon = process_polygon_elem_result(poly_elem=polygon_elem)
+
                 alert_objects.append(CAPEntry(cap_area_desc=cap_area_desc,
                                               cap_certainty=cap_certainty,
                                               cap_effective=cap_effective,
@@ -377,24 +382,8 @@ def main():
                                               title=title_text,
                                               updated=updated)
                                      )
-                # print(link)
-                # print(published_processed)
-                # print(updated)
-                # print(summary)
-                # print(cap_event)
-                # print(cap_effective)
-                # print(cap_expires)
-                # print(cap_status)
-                # print(cap_msg_type)
-                # print(cap_urgency)
-                # print(cap_severity)
-                # print(cap_certainty)
-                # print(cap_area_desc)
-                # print()
     print(alert_objects)
-
-
-
+    # TODO: Stopped at the mapping portion of the CGIS process
 
 if __name__ == "__main__":
     main()
