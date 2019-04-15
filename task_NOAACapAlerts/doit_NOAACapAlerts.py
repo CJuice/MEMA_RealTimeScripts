@@ -294,10 +294,7 @@ def main():
     print(f"Process started: {start}")
 
     # When using a DEV & PROD file during the redesign, avoid issues in using wrong database by inspecting script name.
-    # FIXME: CHANGE OUT FOR SERVER ENVIRONMENT
-    # database_cfg_section_name = determine_database_config_value_based_on_script_name()
-    print("Using hardcoded database environment variable !!!!!!!!!!!!!!!!!!!!!!!!")
-    database_cfg_section_name = "DATABASE_DEV"
+    database_cfg_section_name = determine_database_config_value_based_on_script_name()
 
     # need a current datetime stamp for database entry
     start_date_time = create_date_time_value_for_db()
