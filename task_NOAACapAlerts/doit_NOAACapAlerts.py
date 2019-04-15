@@ -1,5 +1,17 @@
 """
+This is a procedural script for populating MEMA database with NOAA CAP Alerts data.
 
+This process makes requests to NOAA urls for Common Alerting Protocol (CAP) alerts. It uses fips codes to form the
+urls, makes the requests, and receives an xml response. The response is processed for values of interest.
+These values are a title, a link, date published, date updated, summary, date effective, date expires, status,
+message type, urgency, severity, certainty, area description, tips code, event category, geometry if present,
+and a date generated value. The values extracted are encapsulated in a dataclass object that is stored in a list.
+The list of objects is accessed and used to generate the values in the insert sql statement.
+Once the insert statement is completed a database connection is established, all existing records are deleted,
+and the new records are inserted.
+Redesigned from the original CGIS version when MEMA server environments were being migrated to new versions.
+Author: CJuice, 20190415
+Revisions:
 """
 
 
@@ -319,7 +331,7 @@ def main():
                                                 tag_name="title").text
             title_text_processed = replace_problematic_chars_w_underscore(string=title_text)
 
-            print(title_text_processed)
+            print(f"{fips}: {title_text_processed}")
             if title_text_processed == "There are no active watches, warnings or advisories":
                 alert_objects.append(CAPEntry(data_gen=date_updated, fips=fips, title=title_text_processed))
                 break
