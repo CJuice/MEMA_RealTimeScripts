@@ -39,9 +39,8 @@ def main():
     sql_insertion_step_increment = 1000
     sql_values_statement = """({values})"""
     sql_values_statements_list = []
-    sql_values_string_template = """'{title}', '{link}', '{published}', '{updated}', '{summary}',
-    '{cap_effective}', '{cap_expires}', '{cap_status}', '{cap_msg_type}', '{cap_urgency}', '{cap_severity}',
-     '{cap_certainty}', '{cap_area_desc}', '{fips}', '{cap_event}', {cap_geometry}, '{data_gen}'""" # Removed ID field
+    sql_values_string_template = """'{title}', '{link}', '{published}', '{updated}', '{summary}', '{cap_effective}', '{cap_expires}', '{cap_status}', '{cap_msg_type}', '{cap_urgency}', '{cap_severity}', '{cap_certainty}', '{cap_area_desc}', '{fips}', '{cap_event}', {cap_geometry}, '{data_gen}'"""  # Removed ID field
+    task_name = "NOAACapAlerts"
 
     # ASSERTS
     assert os.path.exists(config_file_path)
@@ -257,6 +256,22 @@ def main():
         cfg_parser.read(filenames=cfg_file)
         return cfg_parser
 
+    def sql_insert_generator(sql_values_list, step_increment, sql_insert_string):
+        """
+        Generator for yielding batches of sql values for insertion
+        Purpose is to work with the 1000 record limit of SQL insertion.
+        :param sql_values_list: list of prebuilt record values ready for sql insertion
+        :param step_increment: the record count increment for insertion batches
+        :param sql_insert_string: sql statement string for use with values
+        :return: yield a string for use in insertion
+        """
+        for i in range(0, len(sql_values_list), step_increment):
+            values_in_range = sql_values_list[i: i + step_increment]
+
+            # Build the entire SQL statement to be executed
+            output = sql_insert_string + ",".join(values_in_range)
+            yield output
+
     def time_elapsed(start=datetime.now()):
         """
         Calculate the difference between datetime.now() value and a start datetime value
@@ -398,12 +413,8 @@ def main():
 
     # TODO: Stopped at the mapping portion of the CGIS process
     # Need to build the values string statements for use later on with sql insert statement.
-
-    """'{title}', '{link}', '{published}', '{updated}', '{summary}',
-        '{cap_effective}', '{cap_expires}', '{cap_status}', '{cap_msg_type}', '{cap_urgency}', '{cap_severity}',
-         '{cap_certainty}', '{cap_area_desc}', '{fips}', '{cap_event}', {cap_geometry}, '{data_gen}'"""
     for alert_obj in alert_objects:
-        values = sql_values_string_template.format(id=alert_obj.title,
+        values = sql_values_string_template.format(title=alert_obj.title,
                                                    link=alert_obj.link,
                                                    published=alert_obj.published,
                                                    updated=alert_obj.updated,
@@ -422,7 +433,7 @@ def main():
                                                    data_gen=alert_obj.data_gen)
         values_string = sql_values_statement.format(values=values)
         sql_values_statements_list.append(values_string)
-        print(values_string)
+
     exit()
 
     # Database Transactions
@@ -434,6 +445,56 @@ def main():
                                                                db_user=database_user,
                                                                db_password=database_password)
     database_table_name = realtime_noaacapalerts_tbl.format(database_name=database_name)
+
+    # need the sql table headers as comma separated string values for use in the INSERT statement
+    headers_joined = ",".join([f"{val}" for val in realtime_noaacapalerts_headers])
+    sql_delete_string = sql_delete_template.format(table=database_table_name)
+    sql_insert_string = sql_insert_template.format(
+        table=database_table_name,
+        headers_joined=headers_joined)
+
+    # Need the insert statement generator to be ready for database insertion rounds
+    sql_insert_gen = sql_insert_generator(sql_values_list=sql_values_statements_list,
+                                          step_increment=sql_insertion_step_increment,
+                                          sql_insert_string=sql_insert_string)
+
+    # Build the sql for updating the task tracker table for this process.
+    sql_task_tracker_update = f"UPDATE RealTime_TaskTracking SET lastRun = '{start_date_time}', DataGenerated = (SELECT max(DataGenerated) from {database_table_name}) WHERE taskName = '{task_name}'"
+
+    with pyodbc.connect(full_connection_string) as connection:
+        cursor = connection.cursor()
+
+        # Due to 1000 record insert limit, delete records first and then do insertion rounds for alerts.
+        # The quantity of alerts can vary in size, assuming this is why the old CGIS process accounted for potential
+        #   insert quantity in excess of 1000 record sql limit.
+        try:
+            cursor.execute(sql_delete_string)
+        except Exception as e:
+            print(f"Error deleting records from {database_table_name}. {e}")
+            exit()
+        else:
+            print(f"Delete statement executed. Time elapsed {time_elapsed(start=start)}")
+
+        # Need insert statement in rounds of 1000 records or less to avoid sql limit
+        insert_round_count = 1
+        for batch in sql_insert_gen:
+            try:
+                cursor.execute(batch)
+            except pyodbc.DataError:
+                print(f"A value in the sql exceeds the field length allowed in database table: {batch}")
+            else:
+                print(f"Executing insert batch {insert_round_count}. Time elapsed {time_elapsed(start=start)}")
+                insert_round_count += 1
+
+        # Need to update the task tracker table to record last run time
+        try:
+            cursor.execute(sql_task_tracker_update)
+        except pyodbc.DataError:
+            print(f"A value in the sql exceeds the field length allowed in database table: {sql_task_tracker_update}")
+
+        connection.commit()
+        print(f"Commit successful. Time elapsed {time_elapsed(start=start)}")
+
 
 if __name__ == "__main__":
     main()
