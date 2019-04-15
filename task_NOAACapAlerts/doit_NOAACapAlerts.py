@@ -27,8 +27,6 @@ def main():
     mdc_code_template = "MDC{fips_last_three}"
     noaa_fips_values = [24001, 24003, 24005, 24510, 24009, 24011, 24013, 24015, 24017, 24019, 24021, 24023, 24025,
                         24027, 24029, 24031, 24033, 24035, 24037, 24039, 24041, 24043, 24045, 24047]
-    # mdc_code_template = "ILC{fips_last_three}"  # TESTING
-    # noaa_fips_values = [17003, 17053, 17063, 17075]  # TESTING
     noaa_url_template = r"""http://alerts.weather.gov/cap/wwaatmget.php?x={code}&y=0"""
     realtime_noaacapalerts_headers = ('AlertText', 'URL', 'PublishDate', 'LastUpdated', 'Summary',
                                       'EffectiveDate', 'ExpirationDate', 'Status', 'Type', 'Urgency', 'Severity',
@@ -49,22 +47,22 @@ def main():
     # CLASSES
     @dataclass
     class CAPEntry:
-        cap_area_desc: str = 'Null'
-        cap_certainty: str = 'Null'
-        cap_effective: str = 'Null'
-        cap_event: str = 'Null'
-        cap_expires: str = 'Null'
-        cap_msg_type: str = 'Null'
-        cap_polygon: str = 'Null'
-        cap_severity: str = 'Null'
-        cap_status: str = 'Null'
-        cap_urgency: str = 'Null'
+        cap_area_desc: str = np.NaN
+        cap_certainty: str = np.NaN
+        cap_effective: str = np.NaN
+        cap_event: str = np.NaN
+        cap_expires: str = np.NaN
+        cap_msg_type: str = np.NaN
+        cap_polygon: str = "'Null'"  # Appears that it must be 'Null' and not 'nan'
+        cap_severity: str = np.NaN
+        cap_status: str = np.NaN
+        cap_urgency: str = np.NaN
         data_gen: datetime = '1970-01-01 00:00:00'
-        fips: str = 'Null'
-        link: str = 'Null'
+        fips: str = np.NaN
+        link: str = np.NaN
         published: str = '1970-01-01 00:00:00'
-        summary: str = 'Null'
-        title: str = 'Null'
+        summary: str = np.NaN
+        title: str = np.NaN
         updated: str = '1970-01-01 00:00:00'
 
     # FUNCTIONS
