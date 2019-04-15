@@ -24,13 +24,13 @@ def main():
     config_file = r"doit_config_NOAACapAlerts.cfg"
     config_file_path = os.path.join(_root_file_path, config_file)
     database_connection_string = "DSN={database_name};UID={database_user};PWD={database_password}"
-    # mdc_code_template = "MDC{fips_last_three}"
-    # noaa_fips_values = [24001, 24003, 24005, 24510, 24009, 24011, 24013, 24015, 24017, 24019, 24021, 24023, 24025,
-    #                     24027, 24029, 24031, 24033, 24035, 24037, 24039, 24041, 24043, 24045, 24047]
-    mdc_code_template = "ILC{fips_last_three}"  # TESTING
-    noaa_fips_values = [17003, 17053, 17063, 17075]  # TESTING
+    mdc_code_template = "MDC{fips_last_three}"
+    noaa_fips_values = [24001, 24003, 24005, 24510, 24009, 24011, 24013, 24015, 24017, 24019, 24021, 24023, 24025,
+                        24027, 24029, 24031, 24033, 24035, 24037, 24039, 24041, 24043, 24045, 24047]
+    # mdc_code_template = "ILC{fips_last_three}"  # TESTING
+    # noaa_fips_values = [17003, 17053, 17063, 17075]  # TESTING
     noaa_url_template = r"""http://alerts.weather.gov/cap/wwaatmget.php?x={code}&y=0"""
-    realtime_noaacapalerts_headers = ('ID', 'AlertText', 'URL', 'PublishDate', 'LastUpdated', 'Summary',
+    realtime_noaacapalerts_headers = ('AlertText', 'URL', 'PublishDate', 'LastUpdated', 'Summary',
                                       'EffectiveDate', 'ExpirationDate', 'Status', 'Type', 'Urgency', 'Severity',
                                       'Certainty', 'County', 'fips', 'Event', 'geometry', 'DataGenerated')
     realtime_noaacapalerts_tbl = "[{database_name}].[dbo].[RealTime_NOAACapALerts]"
@@ -49,23 +49,23 @@ def main():
     # CLASSES
     @dataclass
     class CAPEntry:
-        cap_area_desc: str = np.NaN
-        cap_certainty: str = np.NaN
-        cap_effective: str = np.NaN
-        cap_event: str = np.NaN
-        cap_expires: str = np.NaN
-        cap_msg_type: str = np.NaN
-        cap_polygon: str = np.NaN
-        cap_severity: str = np.NaN
-        cap_status: str = np.NaN
-        cap_urgency: str = np.NaN
-        data_gen: datetime = np.NaN
-        fips: str = np.NaN
-        link: str = np.NaN
-        published: str = np.NaN
-        summary: str = np.NaN
-        title: str = np.NaN
-        updated: str = np.NaN
+        cap_area_desc: str = 'Null'
+        cap_certainty: str = 'Null'
+        cap_effective: str = 'Null'
+        cap_event: str = 'Null'
+        cap_expires: str = 'Null'
+        cap_msg_type: str = 'Null'
+        cap_polygon: str = 'Null'
+        cap_severity: str = 'Null'
+        cap_status: str = 'Null'
+        cap_urgency: str = 'Null'
+        data_gen: datetime = 'Null'
+        fips: str = 'Null'
+        link: str = 'Null'
+        published: str = 'Null'
+        summary: str = 'Null'
+        title: str = 'Null'
+        updated: str = 'Null'
 
     # FUNCTIONS
     def assemble_fips_to_mdccode_dict(url_template: str, mdc_code_template: str, fips_values: list) -> dict:
@@ -234,7 +234,8 @@ def main():
         :param poly_elem: TODO
         :return: TODO
         """
-        if poly_elem is None:
+        if poly_elem.text is None:
+            print(f"Problematic polygon element: {poly_elem.text}")
             return np.NaN
         else:
             values = poly_elem.text
@@ -409,9 +410,7 @@ def main():
                                               title=title_text,
                                               updated=updated)
                                      )
-    print(alert_objects)
 
-    # TODO: Stopped at the mapping portion of the CGIS process
     # Need to build the values string statements for use later on with sql insert statement.
     for alert_obj in alert_objects:
         values = sql_values_string_template.format(title=alert_obj.title,
@@ -434,7 +433,7 @@ def main():
         values_string = sql_values_statement.format(values=values)
         sql_values_statements_list.append(values_string)
 
-    exit()
+    # exit()
 
     # Database Transactions
     print(f"\nDatabase operations initiated. Time elapsed {time_elapsed(start=start)}")
@@ -457,6 +456,9 @@ def main():
     sql_insert_gen = sql_insert_generator(sql_values_list=sql_values_statements_list,
                                           step_increment=sql_insertion_step_increment,
                                           sql_insert_string=sql_insert_string)
+    for batch in sql_insert_gen:
+        print(batch)
+    exit()
 
     # Build the sql for updating the task tracker table for this process.
     sql_task_tracker_update = f"UPDATE RealTime_TaskTracking SET lastRun = '{start_date_time}', DataGenerated = (SELECT max(DataGenerated) from {database_table_name}) WHERE taskName = '{task_name}'"
