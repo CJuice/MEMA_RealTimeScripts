@@ -30,6 +30,18 @@ def main():
     mdc_code_template = "ILC{fips_last_three}"  # TESTING
     noaa_fips_values = [17003, 17053, 17063, 17075]  # TESTING
     noaa_url_template = r"""http://alerts.weather.gov/cap/wwaatmget.php?x={code}&y=0"""
+    realtime_noaacapalerts_headers = ('ID', 'AlertText', 'URL', 'PublishDate', 'LastUpdated', 'Summary',
+                                      'EffectiveDate', 'ExpirationDate', 'Status', 'Type', 'Urgency', 'Severity',
+                                      'Certainty', 'County', 'fips', 'Event', 'geometry', 'DataGenerated')
+    realtime_noaacapalerts_tbl = "[{database_name}].[dbo].[RealTime_NOAACapALerts]"
+    sql_delete_template = """DELETE FROM {table};"""
+    sql_insert_template = """INSERT INTO {table} ({headers_joined}) VALUES """
+    sql_insertion_step_increment = 1000
+    sql_values_statement = """({values})"""
+    sql_values_statements_list = []
+    sql_values_string_template = """'{title}', '{link}', '{published}', '{updated}', '{summary}',
+    '{cap_effective}', '{cap_expires}', '{cap_status}', '{cap_msg_type}', '{cap_urgency}', '{cap_severity}',
+     '{cap_certainty}', '{cap_area_desc}', '{fips}', '{cap_event}', {cap_geometry}, '{data_gen}'""" # Removed ID field
 
     # ASSERTS
     assert os.path.exists(config_file_path)
@@ -383,7 +395,45 @@ def main():
                                               updated=updated)
                                      )
     print(alert_objects)
+
     # TODO: Stopped at the mapping portion of the CGIS process
+    # Need to build the values string statements for use later on with sql insert statement.
+
+    """'{title}', '{link}', '{published}', '{updated}', '{summary}',
+        '{cap_effective}', '{cap_expires}', '{cap_status}', '{cap_msg_type}', '{cap_urgency}', '{cap_severity}',
+         '{cap_certainty}', '{cap_area_desc}', '{fips}', '{cap_event}', {cap_geometry}, '{data_gen}'"""
+    for alert_obj in alert_objects:
+        values = sql_values_string_template.format(id=alert_obj.title,
+                                                   link=alert_obj.link,
+                                                   published=alert_obj.published,
+                                                   updated=alert_obj.updated,
+                                                   summary=alert_obj.summary,
+                                                   cap_effective=alert_obj.cap_effective,
+                                                   cap_expires=alert_obj.cap_expires,
+                                                   cap_status=alert_obj.cap_status,
+                                                   cap_msg_type=alert_obj.cap_msg_type,
+                                                   cap_urgency=alert_obj.cap_urgency,
+                                                   cap_severity=alert_obj.cap_severity,
+                                                   cap_certainty=alert_obj.cap_certainty,
+                                                   cap_area_desc=alert_obj.cap_area_desc,
+                                                   fips=alert_obj.fips,
+                                                   cap_event=alert_obj.cap_event,
+                                                   cap_geometry=alert_obj.cap_polygon,
+                                                   data_gen=alert_obj.data_gen)
+        values_string = sql_values_statement.format(values=values)
+        sql_values_statements_list.append(values_string)
+        print(values_string)
+    exit()
+
+    # Database Transactions
+    print(f"\nDatabase operations initiated. Time elapsed {time_elapsed(start=start)}")
+    database_name = config_parser[database_cfg_section_name]["NAME"]
+    database_password = config_parser[database_cfg_section_name]["PASSWORD"]
+    database_user = config_parser[database_cfg_section_name]["USER"]
+    full_connection_string = create_database_connection_string(db_name=database_name,
+                                                               db_user=database_user,
+                                                               db_password=database_password)
+    database_table_name = realtime_noaacapalerts_tbl.format(database_name=database_name)
 
 if __name__ == "__main__":
     main()
