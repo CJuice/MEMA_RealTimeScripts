@@ -11,16 +11,14 @@ def main():
     from dataclasses import dataclass
     import numpy as np
     import os
-    import pandas as pd
     import pyodbc
     import re
     import requests
-    import time
     import xml.etree.ElementTree as ET
-    import dateutil
 
     # VARIABLES
     _root_file_path = os.path.dirname(__file__)
+    alert_objects = []
     config_file = r"doit_config_NOAACapAlerts.cfg"
     config_file_path = os.path.join(_root_file_path, config_file)
     database_connection_string = "DSN={database_name};UID={database_user};PWD={database_password}"
@@ -42,7 +40,7 @@ def main():
 
     # ASSERTS
     assert os.path.exists(config_file_path)
-    print(f"Assertion tests completed.")
+    print("Assertion tests completed.")
 
     # CLASSES
     @dataclass
@@ -57,7 +55,7 @@ def main():
         cap_severity: str = np.NaN
         cap_status: str = np.NaN
         cap_urgency: str = np.NaN
-        data_gen: datetime = '1970-01-01 00:00:00'
+        data_gen: str = '1970-01-01 00:00:00'
         fips: str = np.NaN
         link: str = np.NaN
         published: str = '1970-01-01 00:00:00'
@@ -154,12 +152,12 @@ def main():
 
     def extract_first_immediate_child_feature_from_element(element: ET.Element, tag_name: str) -> ET.Element:
         """Extract first immediate child feature from provided xml ET.Element based on provided tag name
-        All of the tags in the root element begin with the string '{http://www.w3.org/2005/Atom}'. Unable to find
-        the tag by it's name only. Chose to use a try with tag name and then fail to appended value
+
         :param element: xml ET.Element to interrogate
         :param tag_name: name of desired tag
         :return: ET.Element of interest
         """
+
         try:
             result = element.find(tag_name)
         except AttributeError as ae:
@@ -167,18 +165,6 @@ def main():
             exit()
         else:
             return result
-        # else:
-        #     if result is None:
-        #         # NOTE: The 'r' in front of the url is essential for this to work.
-        #         altered_tag_name = appended_unnecessary_url + tag_name
-        #         # print(f"Altering...{altered_tag_name}")
-        #         return element.find(altered_tag_name)
-        #     else:
-        #         return result
-
-    def for_testing_write_xml_to_file(fips, text):
-        with open("test{fips}.txt".format(fips=fips), 'w') as handler:
-            handler.write(text)
 
     def handle_tag_name_excess(xml_extraction_func, element: ET.Element, tag_name: str):
         """
@@ -191,7 +177,7 @@ def main():
         :param tag_name: string tag name being sought
         :return: None or value that extraction func returns
         """
-        re_pattern = f"{tag_name}$"
+        re_pattern = f"{tag_name}$"  # Junk always begins string and tag is at the end. Money sign indicates search end.
         for item in element:
             result = re.search(pattern=re_pattern, string=item.tag)
             if result:
@@ -212,7 +198,7 @@ def main():
             print(f"Unable to process xml response to Element using ET.fromstring(): {e}")
             exit()
 
-    def process_date_string(date_string):
+    def process_date_string(date_string: str) -> str:
         """
         Parse the date string to datetime format using the dateutil parser and return string formatted
         Old CGIS way was to manipulate string by removing a 'T' and doing other actions instead of using module
@@ -224,24 +210,21 @@ def main():
         except Exception as e:
             return '1970-01-01 00:00:00'
 
-    def process_polygon_elem_result(poly_elem):
+    def process_polygon_elem_result(poly_elem: ET.Element) -> str:
         """
-          TODO
-          if present, comes in as text like this
-          '37.23,-89.59 37.25,-89.41 37.13,-89.29 37.09,-89.46 37.23,-89.59'
+          Process geometry value for entry into SQL database as WKT and return, or return "'Null'"
+          if present, comes in as text like this '37.23,-89.59 37.25,-89.41 37.13,-89.29 37.09,-89.46 37.23,-89.59'
           CGIS code note said the following: need to convert polygon list to WKT and reverse lat long (CGIS)
           WKT appears to be "Well Known Text", has to do with database representation of coordinate
           reference systems
-        :param poly_elem: TODO
-        :return: TODO
+        :param poly_elem: geometry element
+        :return: string for entry in database
         """
         if poly_elem.text is None:
-            # print(f"Problematic polygon element: {poly_elem.text}")
-            # return np.NaN
-            return "'Null'"
+            return "'Null'"  # Appears that database requires Null and not nan or other entry when no geometry
         else:
-            values = poly_elem.text
-            coord_pairs_list = values.split(" ")
+            poly_values = poly_elem.text
+            coord_pairs_list = poly_values.split(" ")
             coord_pairs_list_switched = [f"""{value.split(',')[1]} {value.split(',')[0]}""" for value in
                                          coord_pairs_list]
             coords_for_database_use = ",".join(coord_pairs_list_switched)
@@ -250,6 +233,13 @@ def main():
             return result
 
     def replace_problematic_chars_w_underscore(string: str) -> str:
+        """
+        Replace illegal/problematic characters text to avoid database issues and return cleaned string.
+        Apostrophes were showing in county names and this was causing database insert issues. Designed for
+        potential to expand the characters that are replaced.
+        :param string: text to be evaluated
+        :return: cleaned text
+        """
         problem_characters = ("'",)
         for char in problem_characters:
             string = string.replace(char, "_")
@@ -265,7 +255,7 @@ def main():
         cfg_parser.read(filenames=cfg_file)
         return cfg_parser
 
-    def sql_insert_generator(sql_values_list, step_increment, sql_insert_string):
+    def sql_insert_generator(sql_values_list: list, step_increment: int, sql_insert_string: str):
         """
         Generator for yielding batches of sql values for insertion
         Purpose is to work with the 1000 record limit of SQL insertion.
@@ -285,7 +275,7 @@ def main():
         """
         Calculate the difference between datetime.now() value and a start datetime value
         :param start: datetime value
-        :return: datetime value
+        :return: datetime.timedelta value
         """
         return datetime.now() - start
 
@@ -302,15 +292,14 @@ def main():
     # need parser to access credentials
     config_parser = setup_config(config_file_path)
 
+    # need a dictionary with fips code keys and urls for requests
     noaa_cap_alerts_urls_dict = assemble_fips_to_mdccode_dict(url_template=noaa_url_template,
                                                               mdc_code_template=mdc_code_template,
                                                               fips_values=noaa_fips_values)
-    alert_objects = []
+
+    # need to make requests to noaa urls to get xml for interrogation and data extraction
     for fips, noaa_cap_alert_url in noaa_cap_alerts_urls_dict.items():
         response = requests.get(url=noaa_cap_alert_url)
-
-        # for_testing_write_xml_to_file(fips=fips, text=response.text) # TESTING
-
         xml_response_root = parse_xml_response_to_element(response_xml_str=response.text)
         entry_element = handle_tag_name_excess(xml_extraction_func=extract_all_immediate_child_features_from_element,
                                                element=xml_response_root,
@@ -320,10 +309,9 @@ def main():
             element=xml_response_root,
             tag_name="updated")
 
-        # ignored time zone and dst etc conversions at this time
+        # ignored time zone and dst etc conversions at time of redesign
         date_updated = process_date_string(date_string=doc_updated_element.text)
 
-        # continue
         for data in entry_element:
             title_text = handle_tag_name_excess(xml_extraction_func=extract_first_immediate_child_feature_from_element,
                                                 element=data,
@@ -335,8 +323,60 @@ def main():
                 print(title_text_processed)
                 break
             else:
+                cap_area_desc = handle_tag_name_excess(
+                    xml_extraction_func=extract_first_immediate_child_feature_from_element,
+                    element=data,
+                    tag_name="areaDesc").text
+                cap_area_desc_processed = replace_problematic_chars_w_underscore(string=cap_area_desc)
 
-                # TODO: Reorder value extraction to match CAPAlert object order, which is alphabetical
+                cap_certainty = handle_tag_name_excess(
+                    xml_extraction_func=extract_first_immediate_child_feature_from_element,
+                    element=data,
+                    tag_name="certainty").text
+
+                cap_effective = handle_tag_name_excess(
+                    xml_extraction_func=extract_first_immediate_child_feature_from_element,
+                    element=data,
+                    tag_name="effective").text
+                cap_effective_processed = process_date_string(date_string=cap_effective)
+
+                cap_event = handle_tag_name_excess(
+                    xml_extraction_func=extract_first_immediate_child_feature_from_element,
+                    element=data,
+                    tag_name="event").text
+
+                cap_expires = handle_tag_name_excess(
+                    xml_extraction_func=extract_first_immediate_child_feature_from_element,
+                    element=data,
+                    tag_name="expires").text
+                cap_expires_processed = process_date_string(date_string=cap_expires)
+
+                cap_msg_type = handle_tag_name_excess(
+                    xml_extraction_func=extract_first_immediate_child_feature_from_element,
+                    element=data,
+                    tag_name="msgType").text
+
+                cap_polygon_elem = handle_tag_name_excess(
+                    xml_extraction_func=extract_first_immediate_child_feature_from_element,
+                    element=data,
+                    tag_name="polygon")
+                cap_polygon = process_polygon_elem_result(poly_elem=cap_polygon_elem)
+
+                cap_severity = handle_tag_name_excess(
+                    xml_extraction_func=extract_first_immediate_child_feature_from_element,
+                    element=data,
+                    tag_name="severity").text
+
+                cap_status = handle_tag_name_excess(
+                    xml_extraction_func=extract_first_immediate_child_feature_from_element,
+                    element=data,
+                    tag_name="status").text
+
+                cap_urgency = handle_tag_name_excess(
+                    xml_extraction_func=extract_first_immediate_child_feature_from_element,
+                    element=data,
+                    tag_name="urgency").text
+
                 link = handle_tag_name_excess(xml_extraction_func=extract_first_immediate_child_feature_from_element,
                                               element=data,
                                               tag_name="link").attrib.get("href", np.NaN)
@@ -347,65 +387,15 @@ def main():
                     tag_name="published").text
                 published_processed = process_date_string(date_string=published)
 
-                updated = handle_tag_name_excess(xml_extraction_func=extract_first_immediate_child_feature_from_element,
-                                                 element=data,
-                                                 tag_name="updated").text
-                updated_processed = process_date_string(date_string=updated)
-
                 summary = handle_tag_name_excess(xml_extraction_func=extract_first_immediate_child_feature_from_element,
                                                  element=data,
                                                  tag_name="summary").text
                 summary_processed = replace_problematic_chars_w_underscore(string=summary)
 
-                cap_event = handle_tag_name_excess(
-                    xml_extraction_func=extract_first_immediate_child_feature_from_element,
-                    element=data,
-                    tag_name="event").text
-
-                cap_effective = handle_tag_name_excess(
-                    xml_extraction_func=extract_first_immediate_child_feature_from_element,
-                    element=data,
-                    tag_name="effective").text
-                cap_effective_processed = process_date_string(date_string=cap_effective)
-
-                cap_expires = handle_tag_name_excess(
-                    xml_extraction_func=extract_first_immediate_child_feature_from_element,
-                    element=data,
-                    tag_name="expires").text
-                cap_expires_processed = process_date_string(date_string=cap_expires)
-
-                cap_status = handle_tag_name_excess(
-                    xml_extraction_func=extract_first_immediate_child_feature_from_element,
-                    element=data,
-                    tag_name="status").text
-                cap_msg_type = handle_tag_name_excess(
-                    xml_extraction_func=extract_first_immediate_child_feature_from_element,
-                    element=data,
-                    tag_name="msgType").text
-                cap_urgency = handle_tag_name_excess(
-                    xml_extraction_func=extract_first_immediate_child_feature_from_element,
-                    element=data,
-                    tag_name="urgency").text
-                cap_severity = handle_tag_name_excess(
-                    xml_extraction_func=extract_first_immediate_child_feature_from_element,
-                    element=data,
-                    tag_name="severity").text
-                cap_certainty = handle_tag_name_excess(
-                    xml_extraction_func=extract_first_immediate_child_feature_from_element,
-                    element=data,
-                    tag_name="certainty").text
-
-                cap_area_desc = handle_tag_name_excess(
-                    xml_extraction_func=extract_first_immediate_child_feature_from_element,
-                    element=data,
-                    tag_name="areaDesc").text
-                cap_area_desc_processed = replace_problematic_chars_w_underscore(string=cap_area_desc)
-
-                polygon_elem = handle_tag_name_excess(
-                    xml_extraction_func=extract_first_immediate_child_feature_from_element,
-                    element=data,
-                    tag_name="polygon")
-                cap_polygon = process_polygon_elem_result(poly_elem=polygon_elem)
+                updated = handle_tag_name_excess(xml_extraction_func=extract_first_immediate_child_feature_from_element,
+                                                 element=data,
+                                                 tag_name="updated").text
+                updated_processed = process_date_string(date_string=updated)
 
                 alert_objects.append(CAPEntry(cap_area_desc=cap_area_desc_processed,
                                               cap_certainty=cap_certainty,
@@ -425,6 +415,7 @@ def main():
                                               title=title_text_processed,
                                               updated=updated_processed)
                                      )
+    print(f"Requests, data capture, and processing completed. Time elapsed {time_elapsed(start=start)}")
 
     # Need to build the values string statements for use later on with sql insert statement.
     for alert_obj in alert_objects:
@@ -447,8 +438,6 @@ def main():
                                                    data_gen=alert_obj.data_gen)
         values_string = sql_values_statement.format(values=values)
         sql_values_statements_list.append(values_string)
-
-    # exit()
 
     # Database Transactions
     print(f"\nDatabase operations initiated. Time elapsed {time_elapsed(start=start)}")
@@ -480,7 +469,7 @@ def main():
 
         # Due to 1000 record insert limit, delete records first and then do insertion rounds for alerts.
         # The quantity of alerts can vary in size, assuming this is why the old CGIS process accounted for potential
-        #   insert quantity in excess of 1000 record sql limit.
+        #   insert quantity in excess of 1000 record sql limit. Generally seems to be very few records but doesn't hurt.
         try:
             cursor.execute(sql_delete_string)
         except Exception as e:
