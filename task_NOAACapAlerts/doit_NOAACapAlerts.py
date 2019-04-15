@@ -59,13 +59,13 @@ def main():
         cap_severity: str = 'Null'
         cap_status: str = 'Null'
         cap_urgency: str = 'Null'
-        data_gen: datetime = 'Null'
+        data_gen: datetime = '1970-01-01 00:00:00'
         fips: str = 'Null'
         link: str = 'Null'
-        published: str = 'Null'
+        published: str = '1970-01-01 00:00:00'
         summary: str = 'Null'
         title: str = 'Null'
-        updated: str = 'Null'
+        updated: str = '1970-01-01 00:00:00'
 
     # FUNCTIONS
     def assemble_fips_to_mdccode_dict(url_template: str, mdc_code_template: str, fips_values: list) -> dict:
@@ -221,7 +221,10 @@ def main():
         :param date_string: string extracted from response json
         :return: date/time string formatted as indicated
         """
-        return date_parser.parse(date_string).strftime('%Y-%m-%d %H:%M:%S')
+        try:
+            return date_parser.parse(date_string).strftime('%Y-%m-%d %H:%M:%S')
+        except Exception as e:
+            return '1970-01-01 00:00:00'
 
     def process_polygon_elem_result(poly_elem):
         """
@@ -235,8 +238,9 @@ def main():
         :return: TODO
         """
         if poly_elem.text is None:
-            print(f"Problematic polygon element: {poly_elem.text}")
-            return np.NaN
+            # print(f"Problematic polygon element: {poly_elem.text}")
+            # return np.NaN
+            return "'Null'"
         else:
             values = poly_elem.text
             coord_pairs_list = values.split(" ")
@@ -246,6 +250,12 @@ def main():
             result = """geometry::STGeomFromText('POLYGON(({coords_joined}))', 4326)""".format(
                 coords_joined=coords_for_database_use)
             return result
+
+    def replace_problematic_chars_w_underscore(string: str) -> str:
+        problem_characters = ("'",)
+        for char in problem_characters:
+            string = string.replace(char, "_")
+        return string
 
     def setup_config(cfg_file: str) -> configparser.ConfigParser:
         """
@@ -323,15 +333,14 @@ def main():
             title_text = handle_tag_name_excess(xml_extraction_func=extract_first_immediate_child_feature_from_element,
                                                 element=data,
                                                 tag_name="title").text
-            # print(fips, title_text)
-            if title_text == "There are no active watches, warnings or advisories":
-                alert_objects.append(CAPEntry(data_gen=date_updated, fips=fips, title=title_text))
-                print(title_text)
+            title_text_processed = replace_problematic_chars_w_underscore(string=title_text)
+
+            if title_text_processed == "There are no active watches, warnings or advisories":
+                alert_objects.append(CAPEntry(data_gen=date_updated, fips=fips, title=title_text_processed))
+                print(title_text_processed)
                 break
             else:
-                # for feature in data:
-                #     print(feature.tag, feature.attrib, feature.text)
-                # continue
+
                 # TODO: Reorder value extraction to match CAPAlert object order, which is alphabetical
                 link = handle_tag_name_excess(xml_extraction_func=extract_first_immediate_child_feature_from_element,
                                               element=data,
@@ -341,26 +350,35 @@ def main():
                     xml_extraction_func=extract_first_immediate_child_feature_from_element,
                     element=data,
                     tag_name="published").text
-                published_processed = str(date_parser.parse(published))
+                published_processed = process_date_string(date_string=published)
 
                 updated = handle_tag_name_excess(xml_extraction_func=extract_first_immediate_child_feature_from_element,
                                                  element=data,
                                                  tag_name="updated").text
+                updated_processed = process_date_string(date_string=updated)
+
                 summary = handle_tag_name_excess(xml_extraction_func=extract_first_immediate_child_feature_from_element,
                                                  element=data,
                                                  tag_name="summary").text
+                summary_processed = replace_problematic_chars_w_underscore(string=summary)
+
                 cap_event = handle_tag_name_excess(
                     xml_extraction_func=extract_first_immediate_child_feature_from_element,
                     element=data,
                     tag_name="event").text
+
                 cap_effective = handle_tag_name_excess(
                     xml_extraction_func=extract_first_immediate_child_feature_from_element,
                     element=data,
                     tag_name="effective").text
+                cap_effective_processed = process_date_string(date_string=cap_effective)
+
                 cap_expires = handle_tag_name_excess(
                     xml_extraction_func=extract_first_immediate_child_feature_from_element,
                     element=data,
                     tag_name="expires").text
+                cap_expires_processed = process_date_string(date_string=cap_expires)
+
                 cap_status = handle_tag_name_excess(
                     xml_extraction_func=extract_first_immediate_child_feature_from_element,
                     element=data,
@@ -381,10 +399,12 @@ def main():
                     xml_extraction_func=extract_first_immediate_child_feature_from_element,
                     element=data,
                     tag_name="certainty").text
+
                 cap_area_desc = handle_tag_name_excess(
                     xml_extraction_func=extract_first_immediate_child_feature_from_element,
                     element=data,
                     tag_name="areaDesc").text
+                cap_area_desc_processed = replace_problematic_chars_w_underscore(string=cap_area_desc)
 
                 polygon_elem = handle_tag_name_excess(
                     xml_extraction_func=extract_first_immediate_child_feature_from_element,
@@ -392,11 +412,11 @@ def main():
                     tag_name="polygon")
                 cap_polygon = process_polygon_elem_result(poly_elem=polygon_elem)
 
-                alert_objects.append(CAPEntry(cap_area_desc=cap_area_desc,
+                alert_objects.append(CAPEntry(cap_area_desc=cap_area_desc_processed,
                                               cap_certainty=cap_certainty,
-                                              cap_effective=cap_effective,
+                                              cap_effective=cap_effective_processed,
                                               cap_event=cap_event,
-                                              cap_expires=cap_expires,
+                                              cap_expires=cap_expires_processed,
                                               cap_msg_type=cap_msg_type,
                                               cap_polygon=cap_polygon,
                                               cap_severity=cap_severity,
@@ -406,9 +426,9 @@ def main():
                                               fips=fips,
                                               link=link,
                                               published=published_processed,
-                                              summary=summary,
-                                              title=title_text,
-                                              updated=updated)
+                                              summary=summary_processed,
+                                              title=title_text_processed,
+                                              updated=updated_processed)
                                      )
 
     # Need to build the values string statements for use later on with sql insert statement.
@@ -456,9 +476,6 @@ def main():
     sql_insert_gen = sql_insert_generator(sql_values_list=sql_values_statements_list,
                                           step_increment=sql_insertion_step_increment,
                                           sql_insert_string=sql_insert_string)
-    for batch in sql_insert_gen:
-        print(batch)
-    exit()
 
     # Build the sql for updating the task tracker table for this process.
     sql_task_tracker_update = f"UPDATE RealTime_TaskTracking SET lastRun = '{start_date_time}', DataGenerated = (SELECT max(DataGenerated) from {database_table_name}) WHERE taskName = '{task_name}'"
@@ -483,7 +500,11 @@ def main():
             try:
                 cursor.execute(batch)
             except pyodbc.DataError:
-                print(f"A value in the sql exceeds the field length allowed in database table: {batch}")
+                print(f"A value in the sql exceeds the field length allowed in database table.\n{batch}\n")
+                exit()
+            except pyodbc.Error:
+                print(f"pyodbc.Error raised while inserting records.\n{batch}\n")
+                exit()
             else:
                 print(f"Executing insert batch {insert_round_count}. Time elapsed {time_elapsed(start=start)}")
                 insert_round_count += 1
