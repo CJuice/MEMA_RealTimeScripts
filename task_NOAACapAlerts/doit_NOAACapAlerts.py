@@ -309,18 +309,19 @@ def main():
             element=xml_response_root,
             tag_name="updated")
 
-        # ignored time zone and dst etc conversions at time of redesign
+        # ignored time zone and dst etc conversions at time of redesign. Possible TODO
         date_updated = process_date_string(date_string=doc_updated_element.text)
 
+        # Extract values of interest from the entry element that was extracted in a previous step
         for data in entry_element:
             title_text = handle_tag_name_excess(xml_extraction_func=extract_first_immediate_child_feature_from_element,
                                                 element=data,
                                                 tag_name="title").text
             title_text_processed = replace_problematic_chars_w_underscore(string=title_text)
 
+            print(title_text_processed)
             if title_text_processed == "There are no active watches, warnings or advisories":
                 alert_objects.append(CAPEntry(data_gen=date_updated, fips=fips, title=title_text_processed))
-                print(title_text_processed)
                 break
             else:
                 cap_area_desc = handle_tag_name_excess(
@@ -397,6 +398,7 @@ def main():
                                                  tag_name="updated").text
                 updated_processed = process_date_string(date_string=updated)
 
+                # Create CAPEntry dataclass objects and store for use in SQL VALUES building for INSERT statement
                 alert_objects.append(CAPEntry(cap_area_desc=cap_area_desc_processed,
                                               cap_certainty=cap_certainty,
                                               cap_effective=cap_effective_processed,
@@ -417,7 +419,7 @@ def main():
                                      )
     print(f"Requests, data capture, and processing completed. Time elapsed {time_elapsed(start=start)}")
 
-    # Need to build the values string statements for use later on with sql insert statement.
+    # Need to build the values string statements for use later on with SQL INSERT statement.
     for alert_obj in alert_objects:
         values = sql_values_string_template.format(title=alert_obj.title,
                                                    link=alert_obj.link,
