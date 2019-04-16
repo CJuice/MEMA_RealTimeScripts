@@ -100,14 +100,20 @@ def main():
     # need parser to access credentials
     config_parser = setup_config(config_file_path)
 
-    # need mema specific values for requests
-    mema_password = config_parser[mema_cfg_section_name]["PASSWORD"]
+    # need mema specific values for post requests
     mema_request_header_dict = json.loads(config_parser[mema_cfg_section_name]["HEADER"])
     mema_request_url = config_parser[mema_cfg_section_name]["URL"]
     mema_request_xml_data_template = config_parser[mema_cfg_section_name]["XML_DATA_TEMPLATE"]
-    mema_username = config_parser[mema_cfg_section_name]["USERNAME"]
+    mema_request_password = config_parser[mema_cfg_section_name]["PASSWORD"]
+    mema_request_username = config_parser[mema_cfg_section_name]["USERNAME"]
 
-    # need
+    xml_body_string = mema_request_xml_data_template.format(username=mema_request_username,
+                                                            password=mema_request_password,
+                                                            year_value=current_year)
+    response = requests.post(url=mema_request_url, data=xml_body_string, headers=mema_request_header_dict)
+    print(response.status_code)
+
+
     return
 
 
