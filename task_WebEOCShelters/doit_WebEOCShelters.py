@@ -7,6 +7,7 @@ def main():
     # IMPORTS
     from datetime import datetime
     import configparser
+    import json
     import numpy as np
     import os
     import pyodbc
@@ -16,7 +17,9 @@ def main():
     _root_file_path = os.path.dirname(__file__)
     config_file = r"doit_config_WebEOCShelters.cfg"
     config_file_path = os.path.join(_root_file_path, config_file)
+    current_year = datetime.now().year
     database_connection_string = "DSN={database_name};UID={database_user};PWD={database_password}"
+    mema_cfg_section_name = "MEMA_VALUES"
     realtime_webeocshelters_headers = ('ID', 'TableName', 'DataID', 'UserName', 'PositionName', 'EntryDate',
                                        'Main', 'Secondary', 'ShelterTier', 'ShelterType', 'ShelterName',
                                        'ShelterAddress', 'OwnerTitle', 'OwnerContact', 'OwnerContactNumber',
@@ -72,10 +75,39 @@ def main():
             print(f"Script name does not contain _DEV or _PROD so proper Database config file section undetected")
             exit()
 
+    def setup_config(cfg_file: str) -> configparser.ConfigParser:
+        """
+        Instantiate the parser for accessing a config file.
+        :param cfg_file: config file to access
+        :return:
+        """
+        cfg_parser = configparser.ConfigParser()
+        cfg_parser.read(filenames=cfg_file)
+        return cfg_parser
+
     # CLASSES
 
     # FUNCTIONALITY
+    start = datetime.now()
+    print(f"Process started: {start}")
 
+    # When using a DEV & PROD file during the redesign, avoid issues in using wrong database by inspecting script name.
+    # database_cfg_section_name = determine_database_config_value_based_on_script_name()
+
+    # need a current datetime stamp for database entry
+    start_date_time = create_date_time_value_for_db()
+
+    # need parser to access credentials
+    config_parser = setup_config(config_file_path)
+
+    # need mema specific values for requests
+    mema_password = config_parser[mema_cfg_section_name]["PASSWORD"]
+    mema_request_header_dict = json.loads(config_parser[mema_cfg_section_name]["HEADER"])
+    mema_request_url = config_parser[mema_cfg_section_name]["URL"]
+    mema_request_xml_data_template = config_parser[mema_cfg_section_name]["XML_DATA_TEMPLATE"]
+    mema_username = config_parser[mema_cfg_section_name]["USERNAME"]
+
+    # need
     return
 
 
