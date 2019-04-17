@@ -253,20 +253,19 @@ def main():
     data_result_element = handle_tag_name_excess(xml_extraction_func=extract_first_immediate_child_feature_from_element,
                                                  element=data_response_element,
                                                  tag_name="GetDataResult")
-    print(data_result_element.findall("record"))
-    # TODO: Stopped. Why isn't the content past the 'GetDataResult' element searchable???
-    
-    exit()
-    data_element = handle_tag_name_excess(xml_extraction_func=extract_all_immediate_child_features_from_element,
-                                          element=data_result_element,
-                                          tag_name="data")
-    print(data_element)
-    exit()
-    for data in data_element:
-        table_name = handle_tag_name_excess(xml_extraction_func=extract_first_immediate_child_feature_from_element,
-                                            element=data,
-                                            tag_name="tablename").text
-        print(table_name)
+    # NOTE: For some reason the content of the data_result_element is not recognized as xml, but able to parse to xml
+    data_element = parse_xml_response_to_element(response_xml_str=data_result_element.text)
+    record_elements = handle_tag_name_excess(xml_extraction_func=extract_all_immediate_child_features_from_element,
+                                             element=data_element,
+                                             tag_name="record")
+    record_dict_keys = ['tablename', 'dataid', 'username', 'positionname', 'entrydate', 'subscribername', 'prevdataid',
+                 'shelterTier', 'shelterType', 'name', 'address', 'ownertitle', 'ownercontact', 'ownercontactnumber',
+                 'fac_contact_title', 'fac_contactname', 'fac_contactnumber', 'county', 'status', 'eva_capacity',
+                 'eva_occupancy', 'arc', 'specialneeds', 'petfriendly', 'Generator', 'fuel_source', 'exoticpet',
+                 'indoorhouse', 'theGeometry', 'remove', '_sys_latitude', '_sys_longitude']
+
+    for record in record_elements:
+        record_dict = record.attrib
 
     return
 
