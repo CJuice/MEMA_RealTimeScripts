@@ -32,7 +32,7 @@ def main():
                                        'PetFriendly', 'Generator', 'FuelSource', 'ExoticPet', 'IndoorHouse',
                                        'Geometry', 'DataGenerated', 'remove')
     realtime_webeocshelters_tbl = "[{database_name}].[dbo].[RealTime_WebEOCShelters]"
-    shelter_objects = []
+    shelter_objects_list = []
     sql_delete_insert_template = """DELETE FROM {table}; INSERT INTO {table} ({headers_joined}) VALUES """
     sql_values_statement = """({values})"""
     sql_values_statements_list = []
@@ -298,34 +298,36 @@ def main():
 
     for record in record_elements:
         record_dict = record.attrib
-        shelter_objects.append(Shelter(table_name=record_dict.get("tablename", np.NaN),
-                                       data_id=,
-                                       user_name=,
-                                       position_name=,
-                                       entry_date=,
-                                       shelter_tier=,
-                                       shelter_type=,
-                                       name=,
-                                       address=,
-                                       owner_title=,
-                                       owner_contact=,
-                                       owner_contact_number=,
-                                       fac_contact_title=,
-                                       fac_contact_number=,
-                                       county=,
-                                       status=,
-                                       eva_capacity=,
-                                       eva_occupancy=,
-                                       arc=,
-                                       special_needs=,
-                                       pet_friendly=,
-                                       generator=,
-                                       fuel_source=,
-                                       exotic_pet=,
-                                       indoor_house=,
-                                       geometry=,
-                                       remove=,
-                                       data_gen=start_date_time))
+        shelter_objects_list.append(Shelter(table_name=record_dict.get("tablename", np.NaN),
+                                            data_id=record_dict.get("dataid", np.NaN),
+                                            user_name=record_dict.get("username", np.NaN),
+                                            position_name=record_dict.get("positionname", np.NaN),
+                                            entry_date=record_dict.get("entrydate", np.NaN),
+                                            shelter_tier=record_dict.get("shelterTier", np.NaN),
+                                            shelter_type=record_dict.get("shelterType", np.NaN),
+                                            name=record_dict.get("name", np.NaN),
+                                            address=record_dict.get("address", np.NaN),
+                                            owner_title=record_dict.get("ownertitle", np.NaN),
+                                            owner_contact=record_dict.get("ownercontact", np.NaN),
+                                            owner_contact_number=record_dict.get("ownercontactnumber", np.NaN),
+                                            fac_contact_title=record_dict.get("fac_contact_title", np.NaN),
+                                            fac_contact_number=record_dict.get("fac_contactnumber", np.NaN),
+                                            county=record_dict.get("county", np.NaN),
+                                            status=record_dict.get("status", np.NaN),
+                                            eva_capacity=record_dict.get("eva_capacity", np.NaN),
+                                            eva_occupancy=record_dict.get("eva_occupancy", np.NaN),
+                                            arc=record_dict.get("arc", np.NaN),
+                                            special_needs=record_dict.get("specialneeds", np.NaN),
+                                            pet_friendly=record_dict.get("petfriendly", np.NaN),
+                                            generator=record_dict.get("Generator", np.NaN),
+                                            fuel_source=record_dict.get("fuel_source", np.NaN),
+                                            exotic_pet=record_dict.get("exoticpet", np.NaN),
+                                            indoor_house=record_dict.get("indoorhouse", np.NaN),
+                                            geometry=record_dict.get("theGeometry", np.NaN),
+                                            remove=record_dict.get("remove", np.NaN),
+                                            data_gen=start_date_time))
+    for obj in shelter_objects_list:
+        print(obj)
     return
 
 
