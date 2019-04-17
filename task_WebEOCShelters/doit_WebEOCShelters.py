@@ -5,6 +5,7 @@
 
 def main():
     # IMPORTS
+    from dataclasses import dataclass
     from datetime import datetime
     from dateutil import parser as date_parser
     import configparser
@@ -31,6 +32,7 @@ def main():
                                        'PetFriendly', 'Generator', 'FuelSource', 'ExoticPet', 'IndoorHouse',
                                        'Geometry', 'DataGenerated', 'remove')
     realtime_webeocshelters_tbl = "[{database_name}].[dbo].[RealTime_WebEOCShelters]"
+    shelter_objects = []
     sql_delete_insert_template = """DELETE FROM {table}; INSERT INTO {table} ({headers_joined}) VALUES """
     sql_values_statement = """({values})"""
     sql_values_statements_list = []
@@ -214,6 +216,36 @@ def main():
         return cfg_parser
 
     # CLASSES
+    @dataclass
+    class Shelter:
+        table_name: str
+        data_id: str
+        user_name: str
+        position_name: str
+        entry_date: str
+        shelter_tier: str
+        shelter_type: str
+        name: str
+        address: str
+        owner_title: str
+        owner_contact: str
+        owner_contact_number: str
+        fac_contact_title: str
+        fac_contact_number: str
+        county: str
+        status: str
+        eva_capacity: str
+        eva_occupancy: str
+        arc: str
+        special_needs: str
+        pet_friendly: str
+        generator: str
+        fuel_source: str
+        exotic_pet: str
+        indoor_house: str
+        geometry: str
+        remove: str
+        data_gen: str
 
     # FUNCTIONALITY
     start = datetime.now()
@@ -266,7 +298,34 @@ def main():
 
     for record in record_elements:
         record_dict = record.attrib
-
+        shelter_objects.append(Shelter(table_name=record_dict.get("tablename", np.NaN),
+                                       data_id=,
+                                       user_name=,
+                                       position_name=,
+                                       entry_date=,
+                                       shelter_tier=,
+                                       shelter_type=,
+                                       name=,
+                                       address=,
+                                       owner_title=,
+                                       owner_contact=,
+                                       owner_contact_number=,
+                                       fac_contact_title=,
+                                       fac_contact_number=,
+                                       county=,
+                                       status=,
+                                       eva_capacity=,
+                                       eva_occupancy=,
+                                       arc=,
+                                       special_needs=,
+                                       pet_friendly=,
+                                       generator=,
+                                       fuel_source=,
+                                       exotic_pet=,
+                                       indoor_house=,
+                                       geometry=,
+                                       remove=,
+                                       data_gen=start_date_time))
     return
 
 
