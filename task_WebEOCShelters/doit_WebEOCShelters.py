@@ -243,6 +243,30 @@ def main():
     response = requests.post(url=mema_request_url, data=xml_body_string, headers=mema_request_header_dict)
     xml_response_root = parse_xml_response_to_element(response_xml_str=response.text)
 
+    # NOTE: burrowing down into the xml step by step
+    body_element = handle_tag_name_excess(xml_extraction_func=extract_first_immediate_child_feature_from_element,
+                                          element=xml_response_root,
+                                          tag_name="Body")
+    data_response_element = handle_tag_name_excess(xml_extraction_func=extract_first_immediate_child_feature_from_element,
+                                                   element=body_element,
+                                                   tag_name="GetDataResponse")
+    data_result_element = handle_tag_name_excess(xml_extraction_func=extract_first_immediate_child_feature_from_element,
+                                                 element=data_response_element,
+                                                 tag_name="GetDataResult")
+    print(data_result_element.findall("record"))
+    # TODO: Stopped. Why isn't the content past the 'GetDataResult' element searchable???
+    
+    exit()
+    data_element = handle_tag_name_excess(xml_extraction_func=extract_all_immediate_child_features_from_element,
+                                          element=data_result_element,
+                                          tag_name="data")
+    print(data_element)
+    exit()
+    for data in data_element:
+        table_name = handle_tag_name_excess(xml_extraction_func=extract_first_immediate_child_feature_from_element,
+                                            element=data,
+                                            tag_name="tablename").text
+        print(table_name)
 
     return
 
