@@ -36,7 +36,7 @@ def main():
     sql_delete_insert_template = """DELETE FROM {table}; INSERT INTO {table} ({headers_joined}) VALUES """
     sql_values_statement = """({values})"""
     sql_values_statements_list = []
-    sql_values_string_template = """{id}, '{table_name}', {data_id}, '{user_name}', '{position_name}', '{entry_date}', '{main}', '{secondary}', '{shelter_tier}', '{shelter_type}', '{shelter_name}', '{shelter_address}', '{owner_title}', '{owner_contact}', '{owner_contact_number}', '{fac_contact_title}', '{fac_contact_name}', '{fac_contact_number}', '{county}', '{shelter_status}', {capacity}, {occupancy}, '{arc}', '{special_needs}', '{pet_friendly}', '{generator}', '{fuel_source}', '{exotic_pet}', '{indoor_house}', '{geometry}', '{data_gen}', {remove}"""
+    sql_values_string_template = """'{table_name}', {data_id}, '{user_name}', '{position_name}', '{entry_date}', '{main}', '{secondary}', '{shelter_tier}', '{shelter_type}', '{shelter_name}', '{shelter_address}', '{owner_title}', '{owner_contact}', '{owner_contact_number}', '{fac_contact_title}', '{fac_contact_name}', '{fac_contact_number}', '{county}', '{shelter_status}', {capacity}, {occupancy}, '{arc}', '{special_needs}', '{pet_friendly}', '{generator}', '{fuel_source}', '{exotic_pet}', '{indoor_house}', '{geometry}', '{data_gen}', {remove}"""
     task_name = "WebEOCShelters"
 
     print(f"Variables completed.")
@@ -269,6 +269,7 @@ def main():
         owner_contact: str
         owner_contact_number: str
         fac_contact_title: str
+        fac_contact_name: str
         fac_contact_number: str
         county: str
         status: str
@@ -361,6 +362,7 @@ def main():
                                             owner_contact=record_dict.get("ownercontact", np.NaN),
                                             owner_contact_number=record_dict.get("ownercontactnumber", np.NaN),
                                             fac_contact_title=record_dict.get("fac_contact_title", np.NaN),
+                                            fac_contact_name=record_dict.get("fac_contactname", np.NaN),
                                             fac_contact_number=record_dict.get("fac_contactnumber", np.NaN),
                                             county=county,
                                             status=record_dict.get("status", np.NaN),
@@ -378,10 +380,39 @@ def main():
                                             data_gen=start_date_time)
                                     )
     for shelter in shelter_objects_list:
-        values = sql_values_string_template.format()
+        values = sql_values_string_template.format(table_name=shelter.table_name,
+                                                   data_id=shelter.data_id,
+                                                   user_name=shelter.user_name,
+                                                   position_name=shelter.position_name,
+                                                   entry_date=shelter.entry_date,
+                                                   main=shelter.main,
+                                                   secondary=shelter.secondary,
+                                                   shelter_tier=shelter.shelter_tier,
+                                                   shelter_type=shelter.shelter_type,
+                                                   shelter_name=shelter.name,
+                                                   shelter_address=shelter.address,
+                                                   owner_title=shelter.owner_title,
+                                                   owner_contact=shelter.owner_contact,
+                                                   owner_contact_number=shelter.owner_contact_number,
+                                                   fac_contact_title=shelter.fac_contact_title,
+                                                   fac_contact_name=shelter.fac_contact_name,
+                                                   fac_contact_number=shelter.fac_contact_number,
+                                                   county=shelter.county,
+                                                   shelter_status=shelter.status,
+                                                   capacity=shelter.eva_capacity,
+                                                   occupancy=shelter.eva_occupancy,
+                                                   arc=shelter.arc,
+                                                   special_needs=shelter.special_needs,
+                                                   pet_friendly=shelter.pet_friendly,
+                                                   generator=shelter.generator,
+                                                   fuel_source=shelter.fuel_source,
+                                                   exotic_pet=shelter.exotic_pet,
+                                                   indoor_house=shelter.indoor_house,
+                                                   geometry=shelter.geometry,
+                                                   data_gen=shelter.data_gen,
+                                                   remove=shelter.remove)
         values_string = sql_values_statement.format(values=values)
         sql_values_statements_list.append(values_string)
-
 
     print(f"Requests, data capture, and processing completed. Time elapsed {time_elapsed(start=start)}")
 
