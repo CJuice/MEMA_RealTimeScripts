@@ -1,13 +1,22 @@
 """
+This is a procedural script for populating MEMA database with Shelter data.
 
+This process makes request to MEMA web services. It captures many values from response JSON. See the Shelter dataclass
+for insights into the values that are extracted. Shelter Dataclass objects are created with these values and
+stored in a list. The list of objects is accessed and used to generate the values in the insert sql statement.
+Once the insert statement is completed a database connection is established, all existing records are deleted,
+and the new records are inserted.
+Redesigned from the original CGIS version when MEMA server environments were being migrated to new versions.
+Author: CJuice, 20190418
+Revisions:
 """
 
 
 def main():
+
     # IMPORTS
     from dataclasses import dataclass
     from datetime import datetime
-    from dateutil import parser as date_parser
     import configparser
     import json
     import numpy as np
@@ -24,13 +33,7 @@ def main():
     current_year = datetime.now().year
     database_connection_string = "DSN={database_name};UID={database_user};PWD={database_password}"
     mema_cfg_section_name = "MEMA_VALUES"
-    # realtime_webeocshelters_headers = ('TableName', 'DataID', 'UserName', 'PositionName', 'EntryDate',
-    #                                    'Main', 'Secondary', 'ShelterTier', 'ShelterType', 'ShelterName',
-    #                                    'ShelterAddress', 'OwnerTitle', 'OwnerContact', 'OwnerContactNumber',
-    #                                    'FacContactTitle', 'FacContactName', 'FacContactNumber', 'County',
-    #                                    'ShelterStatus', 'Capacity', 'Occupancy', 'Arc', 'SpecialNeeds',
-    #                                    'PetFriendly', 'Generator', 'FuelSource', 'ExoticPet', 'IndoorHouse',
-    #                                    'Geometry', 'DataGenerated', 'remove')
+        # Notice, Main and Secondary are not in the headers list or template string for values
     realtime_webeocshelters_headers = ('TableName', 'DataID', 'UserName', 'PositionName', 'EntryDate',
                                        'ShelterTier', 'ShelterType', 'ShelterName',
                                        'ShelterAddress', 'OwnerTitle', 'OwnerContact', 'OwnerContactNumber',
@@ -177,18 +180,6 @@ def main():
             print(f"Unable to process xml response to Element using ET.fromstring(): {e}")
             exit()
 
-    def process_date_string(date_string: str) -> str:
-        """
-        Parse the date string to datetime format using the dateutil parser and return string formatted
-        Old CGIS way was to manipulate string by removing a 'T' and doing other actions instead of using module
-        :param date_string: string extracted from response json
-        :return: date/time string formatted as indicated
-        """
-        try:
-            return date_parser.parse(date_string).strftime('%Y-%m-%d %H:%M:%S')
-        except Exception as e:
-            return '1970-01-01 00:00:00'
-
     def process_geometry_value(geometry_value: str) -> str:
         """
         Process geometry value for entry into SQL database, or return "'Null'"
@@ -263,6 +254,7 @@ def main():
     # CLASSES
     @dataclass
     class Shelter:
+        """Dataclass to hold all extracted variables needed for later sql table insertion"""
         table_name: str
         data_id: int
         user_name: str
@@ -381,6 +373,7 @@ def main():
                                             data_gen=start_date_time)
                                     )
 
+    # Need to build out and store the VALUES for sql table insertion
     for shelter in shelter_objects_list:
         values = sql_values_string_template.format(table_name=shelter.table_name,
                                                    data_id=shelter.data_id,
