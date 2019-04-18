@@ -56,19 +56,30 @@ def main():
     print(f"Assertion tests completed.")
 
     # FUNCTIONS
+    def check_empty_str(val):
+        """
+        Process values, replacing empty strings with 'nan' so database doesn't have blank cells
+        :param val:
+        :return:
+        """
+        if val == "":
+            return str(np.NaN)
+        else:
+            return val
+
     def clean_record_string_values_for_database(value_dict: dict) -> dict:
         """
         Clean string values by stripping whitespace from values.
         Noticed some values have extra whitespace or values are just whitespace (address is example)
         example of this is address value of '  '
-        :param value_dict: record dictionary extraced from xml
+        :param value_dict: record dictionary extracted from xml
         :return: value dict with cleaned values
         """
         for key, value in value_dict.items():
             try:
                 value_dict[key] = value.strip()
             except AttributeError as ae:
-                pass
+                continue
         return value_dict
 
     def create_database_connection_string(db_name: str, db_user: str, db_password: str) -> str:
@@ -341,33 +352,56 @@ def main():
         geometry = process_geometry_value(record_dict.get("theGeometry", "'Null'"))
         remove = process_remove_value(record_dict.get("remove", 0))
 
+        # perform check for empty strings and replace with np.NaN
+        table_name = check_empty_str(record_dict.get("tablename", np.NaN))
+        position_name = check_empty_str(record_dict.get("positionname", np.NaN))
+        shelter_tier = check_empty_str(record_dict.get("shelterTier", np.NaN))
+        shelter_type = check_empty_str(record_dict.get("shelterType", np.NaN))
+        shelter_name = check_empty_str(name)
+        shelter_address = check_empty_str(address)
+        owner_title = check_empty_str(val=record_dict.get("ownertitle", np.NaN))
+        owner_contact = check_empty_str(val=record_dict.get("ownercontact", np.NaN))
+        owner_contact_number = check_empty_str(val=record_dict.get("ownercontactnumber", np.NaN))
+        fac_contact_title = check_empty_str(val=record_dict.get("fac_contact_title", np.NaN))
+        fac_contact_name = check_empty_str(val=record_dict.get("fac_contactname", np.NaN))
+        fac_contact_number = check_empty_str(val=record_dict.get("fac_contactnumber", np.NaN))
+        county_clean = check_empty_str(val=county)
+        shelter_status = check_empty_str(val=record_dict.get("status", np.NaN))
+        arc = check_empty_str(val=record_dict.get("arc", np.NaN))
+        special_needs = check_empty_str(val=record_dict.get("specialneeds", np.NaN))
+        pet_friendly = check_empty_str(val=record_dict.get("petfriendly", np.NaN))
+        generator = check_empty_str(val=record_dict.get("Generator", np.NaN))
+        fuel_source = check_empty_str(val=record_dict.get("fuel_source", np.NaN))
+        exotic_pet = check_empty_str(val=record_dict.get("exoticpet", np.NaN))
+        indoor_house = check_empty_str(val=record_dict.get("indoorhouse", np.NaN))
+
         # Create and store the shelter dataclass objects for database action use.
-        shelter_objects_list.append(Shelter(table_name=record_dict.get("tablename", np.NaN),
+        shelter_objects_list.append(Shelter(table_name=table_name,
                                             data_id=data_id,
                                             user_name=user_name,
-                                            position_name=record_dict.get("positionname", np.NaN),
+                                            position_name=position_name,
                                             entry_date=record_dict.get("entrydate", np.NaN),
-                                            shelter_tier=record_dict.get("shelterTier", np.NaN),
-                                            shelter_type=record_dict.get("shelterType", np.NaN),
-                                            name=name,
-                                            address=address,
-                                            owner_title=record_dict.get("ownertitle", np.NaN),
-                                            owner_contact=record_dict.get("ownercontact", np.NaN),
-                                            owner_contact_number=record_dict.get("ownercontactnumber", np.NaN),
-                                            fac_contact_title=record_dict.get("fac_contact_title", np.NaN),
-                                            fac_contact_name=record_dict.get("fac_contactname", np.NaN),
-                                            fac_contact_number=record_dict.get("fac_contactnumber", np.NaN),
-                                            county=county,
-                                            status=record_dict.get("status", np.NaN),
+                                            shelter_tier=shelter_tier,
+                                            shelter_type=shelter_type,
+                                            name=shelter_name,
+                                            address=shelter_address,
+                                            owner_title=owner_title,
+                                            owner_contact=owner_contact,
+                                            owner_contact_number=owner_contact_number,
+                                            fac_contact_title=fac_contact_title,
+                                            fac_contact_name=fac_contact_name,
+                                            fac_contact_number=fac_contact_number,
+                                            county=county_clean,
+                                            status=shelter_status,
                                             eva_capacity=record_dict.get("eva_capacity", np.NaN),
                                             eva_occupancy=record_dict.get("eva_occupancy", np.NaN),
-                                            arc=record_dict.get("arc", np.NaN),
-                                            special_needs=record_dict.get("specialneeds", np.NaN),
-                                            pet_friendly=record_dict.get("petfriendly", np.NaN),
-                                            generator=record_dict.get("Generator", np.NaN),
-                                            fuel_source=record_dict.get("fuel_source", np.NaN),
-                                            exotic_pet=record_dict.get("exoticpet", np.NaN),
-                                            indoor_house=record_dict.get("indoorhouse", np.NaN),
+                                            arc=arc,
+                                            special_needs=special_needs,
+                                            pet_friendly=pet_friendly,
+                                            generator=generator,
+                                            fuel_source=fuel_source,
+                                            exotic_pet=exotic_pet,
+                                            indoor_house=indoor_house,
                                             geometry=geometry,
                                             remove=remove,
                                             data_gen=start_date_time)
