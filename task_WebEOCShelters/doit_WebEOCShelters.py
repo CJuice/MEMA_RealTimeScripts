@@ -46,6 +46,21 @@ def main():
     print(f"Assertion tests completed.")
 
     # FUNCTIONS
+    def clean_record_string_values_for_database(value_dict: dict) -> dict:
+        """
+        Clean string values by stripping whitespace from values.
+        Noticed some values have extra whitespace or values are just whitespace (address is example)
+        example of this is address value of '  '
+        :param value_dict: record dictionary extraced from xml
+        :return: value dict with cleaned values
+        """
+        for key, value in value_dict.items():
+            try:
+                value_dict[key] = value.strip()
+            except AttributeError as ae:
+                pass
+        return value_dict
+
     def create_database_connection_string(db_name: str, db_user: str, db_password: str) -> str:
         """
         Create the connection string for accessing database and return.
@@ -205,6 +220,17 @@ def main():
             string = string.replace(char, "_")
         return string
 
+    def process_user_name(value: str) -> str:
+        """
+        Logic for processing extracted user name value and returning original value or substitute string
+        :param value: extracted value
+        :return: string substitute or original value
+        """
+        if value == "":
+            return "User Account No Longer Exists"
+        else:
+            return value
+
     def setup_config(cfg_file: str) -> configparser.ConfigParser:
         """
         Instantiate the parser for accessing a config file.
@@ -219,7 +245,7 @@ def main():
     @dataclass
     class Shelter:
         table_name: str
-        data_id: str
+        data_id: int
         user_name: str
         position_name: str
         entry_date: str
@@ -297,22 +323,30 @@ def main():
                  'indoorhouse', 'theGeometry', 'remove', '_sys_latitude', '_sys_longitude']
 
     for record in record_elements:
-        record_dict = record.attrib
+        record_dict = clean_record_string_values_for_database(record.attrib)
+
+        # need to handle the few items that require processing for data type or logic
+        data_id = int(record_dict.get("dataid", -9999))
+        user_name = process_user_name(record_dict.get("username", np.NaN))
+        name = replace_problematic_chars_w_underscore(record_dict.get("name", np.NaN))
+        county = replace_problematic_chars_w_underscore(record_dict.get("county", np.NaN))
+
+        # Create and store the shelter dataclass objects for database action use.
         shelter_objects_list.append(Shelter(table_name=record_dict.get("tablename", np.NaN),
-                                            data_id=record_dict.get("dataid", np.NaN),
-                                            user_name=record_dict.get("username", np.NaN),
+                                            data_id=data_id,
+                                            user_name=user_name,
                                             position_name=record_dict.get("positionname", np.NaN),
                                             entry_date=record_dict.get("entrydate", np.NaN),
                                             shelter_tier=record_dict.get("shelterTier", np.NaN),
                                             shelter_type=record_dict.get("shelterType", np.NaN),
-                                            name=record_dict.get("name", np.NaN),
+                                            name=name,
                                             address=record_dict.get("address", np.NaN),
                                             owner_title=record_dict.get("ownertitle", np.NaN),
                                             owner_contact=record_dict.get("ownercontact", np.NaN),
                                             owner_contact_number=record_dict.get("ownercontactnumber", np.NaN),
                                             fac_contact_title=record_dict.get("fac_contact_title", np.NaN),
                                             fac_contact_number=record_dict.get("fac_contactnumber", np.NaN),
-                                            county=record_dict.get("county", np.NaN),
+                                            county=county,
                                             status=record_dict.get("status", np.NaN),
                                             eva_capacity=record_dict.get("eva_capacity", np.NaN),
                                             eva_occupancy=record_dict.get("eva_occupancy", np.NaN),
