@@ -24,8 +24,15 @@ def main():
     current_year = datetime.now().year
     database_connection_string = "DSN={database_name};UID={database_user};PWD={database_password}"
     mema_cfg_section_name = "MEMA_VALUES"
+    # realtime_webeocshelters_headers = ('TableName', 'DataID', 'UserName', 'PositionName', 'EntryDate',
+    #                                    'Main', 'Secondary', 'ShelterTier', 'ShelterType', 'ShelterName',
+    #                                    'ShelterAddress', 'OwnerTitle', 'OwnerContact', 'OwnerContactNumber',
+    #                                    'FacContactTitle', 'FacContactName', 'FacContactNumber', 'County',
+    #                                    'ShelterStatus', 'Capacity', 'Occupancy', 'Arc', 'SpecialNeeds',
+    #                                    'PetFriendly', 'Generator', 'FuelSource', 'ExoticPet', 'IndoorHouse',
+    #                                    'Geometry', 'DataGenerated', 'remove')
     realtime_webeocshelters_headers = ('TableName', 'DataID', 'UserName', 'PositionName', 'EntryDate',
-                                       'Main', 'Secondary', 'ShelterTier', 'ShelterType', 'ShelterName',
+                                       'ShelterTier', 'ShelterType', 'ShelterName',
                                        'ShelterAddress', 'OwnerTitle', 'OwnerContact', 'OwnerContactNumber',
                                        'FacContactTitle', 'FacContactName', 'FacContactNumber', 'County',
                                        'ShelterStatus', 'Capacity', 'Occupancy', 'Arc', 'SpecialNeeds',
@@ -36,7 +43,7 @@ def main():
     sql_delete_insert_template = """DELETE FROM {table}; INSERT INTO {table} ({headers_joined}) VALUES """
     sql_values_statement = """({values})"""
     sql_values_statements_list = []
-    sql_values_string_template = """'{table_name}', {data_id}, '{user_name}', '{position_name}', '{entry_date}', '{main}', '{secondary}', '{shelter_tier}', '{shelter_type}', '{shelter_name}', '{shelter_address}', '{owner_title}', '{owner_contact}', '{owner_contact_number}', '{fac_contact_title}', '{fac_contact_name}', '{fac_contact_number}', '{county}', '{shelter_status}', {capacity}, {occupancy}, '{arc}', '{special_needs}', '{pet_friendly}', '{generator}', '{fuel_source}', '{exotic_pet}', '{indoor_house}', '{geometry}', '{data_gen}', {remove}"""
+    sql_values_string_template = """'{table_name}', {data_id}, '{user_name}', '{position_name}', '{entry_date}', '{shelter_tier}', '{shelter_type}', '{shelter_name}', '{shelter_address}', '{owner_title}', '{owner_contact}', '{owner_contact_number}', '{fac_contact_title}', '{fac_contact_name}', '{fac_contact_number}', '{county}', '{shelter_status}', {capacity}, {occupancy}, '{arc}', '{special_needs}', '{pet_friendly}', '{generator}', '{fuel_source}', '{exotic_pet}', '{indoor_house}', {geometry}, '{data_gen}', {remove}"""
     task_name = "WebEOCShelters"
 
     print(f"Variables completed.")
@@ -184,15 +191,19 @@ def main():
 
     def process_geometry_value(geometry_value: str) -> str:
         """
-          Process geometry value for entry into SQL database, or return "'Null'"
-          if present, substitute into the correct sql string format for a geometry value and if not, return 'Null'
+        Process geometry value for entry into SQL database, or return "'Null'"
+        if present, substitute into the correct sql string format for a geometry value and if not, return 'Null'
+        NOTE: SQL insertion syntax for geometry requires the following syntax (example):
+            geometry::STGeomFromText('POINT (-76.8705880274927 38.9963106309707)', 4326)
+        The geometry::STGeomFromText portion and spatial ref cannot be surrounded by single/double quotes
+        as it is a sql action not a string.
         :param geometry_value: geometry value extracted from xml
         :return: string for entry in database
         """
-        if geometry_value == "":
-            return "Null"  # Appears that database requires Null and not nan or other entry when no geometry
+        if geometry_value == "" or geometry_value == "'Null'":
+            return "'Null'"  # Appears that database requires 'Null' and not nan or other entry when no geometry
         else:
-            result = """geometry::STGeomFromText("{geometry_value}", 4326)""".format(
+            result = """geometry::STGeomFromText('{geometry_value}', 4326)""".format(
                 geometry_value=geometry_value)
             return result
 
@@ -281,8 +292,6 @@ def main():
         geometry: str
         remove: int
         data_gen: str
-        secondary: int = 0
-        main: int = 0
 
     # FUNCTIONALITY
     start = datetime.now()
@@ -321,16 +330,12 @@ def main():
     data_result_element = handle_tag_name_excess(xml_extraction_func=extract_first_immediate_child_feature_from_element,
                                                  element=data_response_element,
                                                  tag_name="GetDataResult")
+
     # NOTE: For some reason the content of the data_result_element is not recognized as xml, but able to parse to xml
     data_element = parse_xml_response_to_element(response_xml_str=data_result_element.text)
     record_elements = handle_tag_name_excess(xml_extraction_func=extract_all_immediate_child_features_from_element,
                                              element=data_element,
                                              tag_name="record")
-    record_dict_keys = ['tablename', 'dataid', 'username', 'positionname', 'entrydate', 'subscribername', 'prevdataid',
-                 'shelterTier', 'shelterType', 'name', 'address', 'ownertitle', 'ownercontact', 'ownercontactnumber',
-                 'fac_contact_title', 'fac_contactname', 'fac_contactnumber', 'county', 'status', 'eva_capacity',
-                 'eva_occupancy', 'arc', 'specialneeds', 'petfriendly', 'Generator', 'fuel_source', 'exoticpet',
-                 'indoorhouse', 'theGeometry', 'remove', '_sys_latitude', '_sys_longitude']
 
     for record in record_elements:
         record_dict = clean_record_string_values_for_database(record.attrib)
@@ -341,10 +346,7 @@ def main():
         name = replace_problematic_chars_w_underscore(record_dict.get("name", np.NaN))
         address = replace_problematic_chars_w_underscore(record_dict.get("address", np.NaN))
         county = replace_problematic_chars_w_underscore(record_dict.get("county", np.NaN))
-        geometry = process_geometry_value(record_dict.get("theGeometry", "Null"))
-        # if record_dict.get("theGeometry", "Null") != "Null":
-        #     print(record_dict.get("theGeometry", "Null"))
-
+        geometry = process_geometry_value(record_dict.get("theGeometry", "'Null'"))
         remove = process_remove_value(record_dict.get("remove", 0))
 
         # Create and store the shelter dataclass objects for database action use.
@@ -378,14 +380,13 @@ def main():
                                             remove=remove,
                                             data_gen=start_date_time)
                                     )
+
     for shelter in shelter_objects_list:
         values = sql_values_string_template.format(table_name=shelter.table_name,
                                                    data_id=shelter.data_id,
                                                    user_name=shelter.user_name,
                                                    position_name=shelter.position_name,
                                                    entry_date=shelter.entry_date,
-                                                   main=shelter.main,
-                                                   secondary=shelter.secondary,
                                                    shelter_tier=shelter.shelter_tier,
                                                    shelter_type=shelter.shelter_type,
                                                    shelter_name=shelter.name,
@@ -433,10 +434,10 @@ def main():
 
     # Build the entire SQL statement to be executed
     full_sql_string = sql_delete_insert_string + ",".join(sql_values_statements_list)
-    print(full_sql_string)
+
     # Build the sql for updating the task tracker table for this process.
     sql_task_tracker_update = f"UPDATE RealTime_TaskTracking SET lastRun = '{start_date_time}', DataGenerated = (SELECT max(DataGenerated) from {realtime_webeocshelters_tbl_string}) WHERE taskName = '{task_name}'"
-    exit()
+
     with pyodbc.connect(full_connection_string) as connection:
         cursor = connection.cursor()
         try:
