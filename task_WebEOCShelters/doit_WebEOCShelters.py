@@ -24,7 +24,7 @@ def main():
     current_year = datetime.now().year
     database_connection_string = "DSN={database_name};UID={database_user};PWD={database_password}"
     mema_cfg_section_name = "MEMA_VALUES"
-    realtime_webeocshelters_headers = ('ID', 'TableName', 'DataID', 'UserName', 'PositionName', 'EntryDate',
+    realtime_webeocshelters_headers = ('TableName', 'DataID', 'UserName', 'PositionName', 'EntryDate',
                                        'Main', 'Secondary', 'ShelterTier', 'ShelterType', 'ShelterName',
                                        'ShelterAddress', 'OwnerTitle', 'OwnerContact', 'OwnerContactNumber',
                                        'FacContactTitle', 'FacContactName', 'FacContactNumber', 'County',
@@ -79,7 +79,7 @@ def main():
 
     def determine_database_config_value_based_on_script_name() -> str:
         """
-        Inspect the python script file name to see if it includes _DEV, _PROD, or neither and return appropriate value.
+        Inspect the python script file name to see if it includes _PROD and return appropriate value.
         During redesign there was a DEV and PROD version and each wrote to a different database. When manually
         deploying there was opportunity to error because the variable value had to be manually switched. Now all that
         has to happen is the file name has to be switched and the correct config file section is accessed.
@@ -87,13 +87,10 @@ def main():
         """
 
         file_name, extension = os.path.splitext(os.path.basename(__file__))
-        if "_DEV" in file_name:
-            return "DATABASE_DEV"
-        elif "_PROD" in file_name:
+        if "_PROD" in file_name:
             return "DATABASE_PROD"
         else:
-            print(f"Script name does not contain _DEV or _PROD so proper Database config file section undetected")
-            exit()
+            return "DATABASE_DEV"
 
     def extract_all_immediate_child_features_from_element(element: ET.Element, tag_name: str) -> list:
         """
@@ -193,9 +190,9 @@ def main():
         :return: string for entry in database
         """
         if geometry_value == "":
-            return "'Null'"  # Appears that database requires Null and not nan or other entry when no geometry
+            return "Null"  # Appears that database requires Null and not nan or other entry when no geometry
         else:
-            result = """geometry::STGeomFromText('{geometry_value}', 4326)""".format(
+            result = """geometry::STGeomFromText("{geometry_value}", 4326)""".format(
                 geometry_value=geometry_value)
             return result
 
@@ -252,7 +249,6 @@ def main():
         """
         return datetime.now() - start
 
-
     # CLASSES
     @dataclass
     class Shelter:
@@ -285,8 +281,8 @@ def main():
         geometry: str
         remove: int
         data_gen: str
-        secondary: str = np.NaN
-        main: str = np.NaN
+        secondary: int = 0
+        main: int = 0
 
     # FUNCTIONALITY
     start = datetime.now()
@@ -345,8 +341,11 @@ def main():
         name = replace_problematic_chars_w_underscore(record_dict.get("name", np.NaN))
         address = replace_problematic_chars_w_underscore(record_dict.get("address", np.NaN))
         county = replace_problematic_chars_w_underscore(record_dict.get("county", np.NaN))
-        geometry = process_geometry_value(record_dict.get("theGeometry", np.NaN))
-        remove = process_remove_value(record_dict.get("remove", np.NaN))
+        geometry = process_geometry_value(record_dict.get("theGeometry", "Null"))
+        # if record_dict.get("theGeometry", "Null") != "Null":
+        #     print(record_dict.get("theGeometry", "Null"))
+
+        remove = process_remove_value(record_dict.get("remove", 0))
 
         # Create and store the shelter dataclass objects for database action use.
         shelter_objects_list.append(Shelter(table_name=record_dict.get("tablename", np.NaN),
@@ -434,14 +433,9 @@ def main():
 
     # Build the entire SQL statement to be executed
     full_sql_string = sql_delete_insert_string + ",".join(sql_values_statements_list)
-
+    print(full_sql_string)
     # Build the sql for updating the task tracker table for this process.
     sql_task_tracker_update = f"UPDATE RealTime_TaskTracking SET lastRun = '{start_date_time}', DataGenerated = (SELECT max(DataGenerated) from {realtime_webeocshelters_tbl_string}) WHERE taskName = '{task_name}'"
-
-    print(full_sql_string)
-    print()
-    print(sql_task_tracker_update)
-
     exit()
     with pyodbc.connect(full_connection_string) as connection:
         cursor = connection.cursor()
