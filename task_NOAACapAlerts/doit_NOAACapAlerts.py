@@ -116,7 +116,7 @@ def main():
 
     def determine_database_config_value_based_on_script_name() -> str:
         """
-        Inspect the python script file name to see if it includes _DEV, _PROD, or neither and return appropriate value.
+        Inspect the python script file name to see if it includes _PROD and return appropriate value.
         During redesign there was a DEV and PROD version and each wrote to a different database. When manually
         deploying there was opportunity to error because the variable value had to be manually switched. Now all that
         has to happen is the file name has to be switched and the correct config file section is accessed.
@@ -124,13 +124,10 @@ def main():
         """
 
         file_name, extension = os.path.splitext(os.path.basename(__file__))
-        if "_DEV" in file_name:
-            return "DATABASE_DEV"
-        elif "_PROD" in file_name:
+        if "_PROD" in file_name:
             return "DATABASE_PROD"
         else:
-            print(f"Script name does not contain _DEV or _PROD so proper Database config file section undetected")
-            exit()
+            return "DATABASE_DEV"
 
     def extract_all_immediate_child_features_from_element(element: ET.Element, tag_name: str) -> list:
         """
@@ -224,11 +221,15 @@ def main():
 
     def process_polygon_elem_result(poly_elem: ET.Element) -> str:
         """
-          Process geometry value for entry into SQL database as WKT and return, or return "'Null'"
-          if present, comes in as text like this '37.23,-89.59 37.25,-89.41 37.13,-89.29 37.09,-89.46 37.23,-89.59'
-          CGIS code note said the following: need to convert polygon list to WKT and reverse lat long (CGIS)
-          WKT appears to be "Well Known Text", has to do with database representation of coordinate
-          reference systems
+        Process geometry value for entry into SQL database as WKT and return, or return "'Null'"
+        if present, comes in as text like this '37.23,-89.59 37.25,-89.41 37.13,-89.29 37.09,-89.46 37.23,-89.59'
+        CGIS code note said the following: need to convert polygon list to WKT and reverse lat long (CGIS)
+        WKT appears to be "Well Known Text", has to do with database representation of coordinate
+        reference systems
+        NOTE: SQL insertion syntax for geometry requires the following syntax (example):
+        geometry::STGeomFromText('POINT (-76.8705880274927 38.9963106309707)', 4326)
+        The geometry::STGeomFromText portion and spatial ref cannot be surrounded by single/double quotes
+        as it is a sql action not a string.
         :param poly_elem: geometry element
         :return: string for entry in database
         """

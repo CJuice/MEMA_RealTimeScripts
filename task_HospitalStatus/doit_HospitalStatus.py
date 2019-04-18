@@ -76,7 +76,7 @@ def main():
 
     def determine_database_config_value_based_on_script_name() -> str:
         """
-        Inspect the python script file name to see if it includes _DEV, _PROD, or neither and return appropriate value.
+        Inspect the python script file name to see if it includes _PROD and return appropriate value.
         During redesign there was a DEV and PROD version and each wrote to a different database. When manually
         deploying there was opportunity to error because the variable value had to be manually switched. Now all that
         has to happen is the file name has to be switched and the correct config file section is accessed.
@@ -84,13 +84,10 @@ def main():
         """
 
         file_name, extension = os.path.splitext(os.path.basename(__file__))
-        if "_DEV" in file_name:
-            return "DATABASE_DEV"
-        elif "_PROD" in file_name:
+        if "_PROD" in file_name:
             return "DATABASE_PROD"
         else:
-            print(f"Script name does not contain _DEV or _PROD so proper Database config file section undetected")
-            exit()
+            return "DATABASE_DEV"
 
     def determine_status_level(html_row_series: pd.Series):
         """
