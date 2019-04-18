@@ -153,12 +153,12 @@ def main():
         attributes = feature.get("attributes", {})
         geometry = feature.get("geometry", {})
 
-        gauge_objects_list.append(Gauge(attributes.get("location", None),
-                                        attributes.get("status", None),
-                                        attributes.get("gaugelid", None),
-                                        float(geometry.get("x", None)),
-                                        float(geometry.get("y", None)),
-                                        attributes.get("obstime", None)
+        gauge_objects_list.append(Gauge(location=attributes.get("location", None),
+                                        status=attributes.get("status", None),
+                                        gaugelid=attributes.get("gaugelid", None),
+                                        latitude=float(geometry.get("y", None)),
+                                        longitude=float(geometry.get("x", None)),
+                                        data_gen=attributes.get("obstime", None)
                                         )
                                   )
 
