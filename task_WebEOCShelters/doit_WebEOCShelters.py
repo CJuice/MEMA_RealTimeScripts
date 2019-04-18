@@ -36,7 +36,7 @@ def main():
     sql_delete_insert_template = """DELETE FROM {table}; INSERT INTO {table} ({headers_joined}) VALUES """
     sql_values_statement = """({values})"""
     sql_values_statements_list = []
-    sql_values_string_template = """"""
+    sql_values_string_template = """{id}, '{table_name}', {data_id}, '{user_name}', '{position_name}', '{entry_date}', '{main}', '{secondary}', '{shelter_tier}', '{shelter_type}', '{shelter_name}', '{shelter_address}', '{owner_title}', '{owner_contact}', '{owner_contact_number}', '{fac_contact_title}', '{fac_contact_name}', '{fac_contact_number}', '{county}', '{shelter_status}', {capacity}, {occupancy}, '{arc}', '{special_needs}', '{pet_friendly}', '{generator}', '{fuel_source}', '{exotic_pet}', '{indoor_house}', '{geometry}', '{data_gen}', {remove}"""
     task_name = "WebEOCShelters"
 
     print(f"Variables completed.")
@@ -185,27 +185,41 @@ def main():
         except Exception as e:
             return '1970-01-01 00:00:00'
 
-    def process_polygon_elem_result(poly_elem: ET.Element) -> str:
+    def process_geometry_value(geometry_value: str) -> str:
         """
-          Process geometry value for entry into SQL database as WKT and return, or return "'Null'"
-          if present, comes in as text like this '37.23,-89.59 37.25,-89.41 37.13,-89.29 37.09,-89.46 37.23,-89.59'
-          CGIS code note said the following: need to convert polygon list to WKT and reverse lat long (CGIS)
-          WKT appears to be "Well Known Text", has to do with database representation of coordinate
-          reference systems
-        :param poly_elem: geometry element
+          Process geometry value for entry into SQL database, or return "'Null'"
+          if present, substitute into the correct sql string format for a geometry value and if not, return 'Null'
+        :param geometry_value: geometry value extracted from xml
         :return: string for entry in database
         """
-        if poly_elem.text is None:
+        if geometry_value == "":
             return "'Null'"  # Appears that database requires Null and not nan or other entry when no geometry
         else:
-            poly_values = poly_elem.text
-            coord_pairs_list = poly_values.split(" ")
-            coord_pairs_list_switched = [f"""{value.split(',')[1]} {value.split(',')[0]}""" for value in
-                                         coord_pairs_list]
-            coords_for_database_use = ",".join(coord_pairs_list_switched)
-            result = """geometry::STGeomFromText('POLYGON(({coords_joined}))', 4326)""".format(
-                coords_joined=coords_for_database_use)
+            result = """geometry::STGeomFromText('{geometry_value}', 4326)""".format(
+                geometry_value=geometry_value)
             return result
+
+    def process_remove_value(remove_value: str) -> int:
+        """
+        Need to convert the remove value for a True/False equivalent
+        :param remove_value: string value extracted from xml
+        :return: integer for true (1), false (0)
+        """
+        if remove_value.lower() == "yes":
+            return 1
+        else:
+            return 0
+
+    def process_user_name(value: str) -> str:
+        """
+        Logic for processing extracted user name value and returning original value or substitute string
+        :param value: extracted value
+        :return: string substitute or original value
+        """
+        if value == "":
+            return "User Account No Longer Exists"
+        else:
+            return value
 
     def replace_problematic_chars_w_underscore(string: str) -> str:
         """
@@ -220,17 +234,6 @@ def main():
             string = string.replace(char, "_")
         return string
 
-    def process_user_name(value: str) -> str:
-        """
-        Logic for processing extracted user name value and returning original value or substitute string
-        :param value: extracted value
-        :return: string substitute or original value
-        """
-        if value == "":
-            return "User Account No Longer Exists"
-        else:
-            return value
-
     def setup_config(cfg_file: str) -> configparser.ConfigParser:
         """
         Instantiate the parser for accessing a config file.
@@ -240,6 +243,15 @@ def main():
         cfg_parser = configparser.ConfigParser()
         cfg_parser.read(filenames=cfg_file)
         return cfg_parser
+
+    def time_elapsed(start=datetime.now()):
+        """
+        Calculate the difference between datetime.now() value and a start datetime value
+        :param start: datetime value
+        :return: datetime.timedelta value
+        """
+        return datetime.now() - start
+
 
     # CLASSES
     @dataclass
@@ -270,16 +282,17 @@ def main():
         exotic_pet: str
         indoor_house: str
         geometry: str
-        remove: str
+        remove: int
         data_gen: str
+        secondary: str = np.NaN
+        main: str = np.NaN
 
     # FUNCTIONALITY
     start = datetime.now()
     print(f"Process started: {start}")
 
     # When using a DEV & PROD file during the redesign, avoid issues in using wrong database by inspecting script name.
-    # FIXME: turn this back on when move to server
-    # database_cfg_section_name = determine_database_config_value_based_on_script_name()
+    database_cfg_section_name = determine_database_config_value_based_on_script_name()
 
     # need a current datetime stamp for database entry
     start_date_time = create_date_time_value_for_db()
@@ -329,7 +342,10 @@ def main():
         data_id = int(record_dict.get("dataid", -9999))
         user_name = process_user_name(record_dict.get("username", np.NaN))
         name = replace_problematic_chars_w_underscore(record_dict.get("name", np.NaN))
+        address = replace_problematic_chars_w_underscore(record_dict.get("address", np.NaN))
         county = replace_problematic_chars_w_underscore(record_dict.get("county", np.NaN))
+        geometry = process_geometry_value(record_dict.get("theGeometry", np.NaN))
+        remove = process_remove_value(record_dict.get("remove", np.NaN))
 
         # Create and store the shelter dataclass objects for database action use.
         shelter_objects_list.append(Shelter(table_name=record_dict.get("tablename", np.NaN),
@@ -340,7 +356,7 @@ def main():
                                             shelter_tier=record_dict.get("shelterTier", np.NaN),
                                             shelter_type=record_dict.get("shelterType", np.NaN),
                                             name=name,
-                                            address=record_dict.get("address", np.NaN),
+                                            address=address,
                                             owner_title=record_dict.get("ownertitle", np.NaN),
                                             owner_contact=record_dict.get("ownercontact", np.NaN),
                                             owner_contact_number=record_dict.get("ownercontactnumber", np.NaN),
@@ -357,12 +373,58 @@ def main():
                                             fuel_source=record_dict.get("fuel_source", np.NaN),
                                             exotic_pet=record_dict.get("exoticpet", np.NaN),
                                             indoor_house=record_dict.get("indoorhouse", np.NaN),
-                                            geometry=record_dict.get("theGeometry", np.NaN),
-                                            remove=record_dict.get("remove", np.NaN),
-                                            data_gen=start_date_time))
-    for obj in shelter_objects_list:
-        print(obj)
-    return
+                                            geometry=geometry,
+                                            remove=remove,
+                                            data_gen=start_date_time)
+                                    )
+    for shelter in shelter_objects_list:
+        values = sql_values_string_template.format()
+        values_string = sql_values_statement.format(values=values)
+        sql_values_statements_list.append(values_string)
+
+
+    print(f"Requests, data capture, and processing completed. Time elapsed {time_elapsed(start=start)}")
+
+    # Database Transactions
+    print(f"Database operations initiated. Time elapsed {time_elapsed(start=start)}")
+    database_name = config_parser[database_cfg_section_name]["NAME"]
+    database_password = config_parser[database_cfg_section_name]["PASSWORD"]
+    database_user = config_parser[database_cfg_section_name]["USER"]
+    full_connection_string = create_database_connection_string(db_name=database_name,
+                                                               db_user=database_user,
+                                                               db_password=database_password)
+    realtime_webeocshelters_tbl_string = realtime_webeocshelters_tbl.format(database_name=database_name)
+
+    # need the sql table headers as comma separated string values for use in the DELETE & INSERT statement
+    headers_joined = ",".join([f"{val}" for val in realtime_webeocshelters_headers])
+    sql_delete_insert_string = sql_delete_insert_template.format(
+        table=realtime_webeocshelters_tbl_string,
+        headers_joined=headers_joined)
+
+    # Build the entire SQL statement to be executed
+    full_sql_string = sql_delete_insert_string + ",".join(sql_values_statements_list)
+
+    # Build the sql for updating the task tracker table for this process.
+    sql_task_tracker_update = f"UPDATE RealTime_TaskTracking SET lastRun = '{start_date_time}', DataGenerated = (SELECT max(DataGenerated) from {realtime_webeocshelters_tbl_string}) WHERE taskName = '{task_name}'"
+
+    print(full_sql_string)
+    print()
+    print(sql_task_tracker_update)
+
+    exit()
+    with pyodbc.connect(full_connection_string) as connection:
+        cursor = connection.cursor()
+        try:
+            cursor.execute(full_sql_string)
+            cursor.execute(sql_task_tracker_update)
+        except pyodbc.DataError:
+            print(f"A value in the sql exceeds the field length allowed in database table: {full_sql_string}")
+        else:
+            connection.commit()
+            print(f"Commit successful. Time elapsed {time_elapsed(start=start)}")
+
+    print("\nProcess completed.")
+    print(f"Time elapsed {time_elapsed(start=start)}")
 
 
 if __name__ == "__main__":
