@@ -50,6 +50,7 @@ def main():
     # CLASSES
     @dataclass
     class Gauge:
+        """Data class for holding essential values about a Gauge; most values inserted into SQL database"""
         location: str
         status: str
         gaugelid: str

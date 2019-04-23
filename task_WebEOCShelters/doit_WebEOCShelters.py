@@ -265,7 +265,7 @@ def main():
     # CLASSES
     @dataclass
     class Shelter:
-        """Dataclass to hold all extracted variables needed for later sql table insertion"""
+        """Data class for holding essential values about a shelter; most values inserted into SQL database"""
         table_name: str
         data_id: int
         user_name: str

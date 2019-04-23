@@ -16,6 +16,7 @@ Revisions:
 
 
 def main():
+
     # IMPORTS
     from datetime import datetime
     from dateutil import parser as date_parser
@@ -57,6 +58,7 @@ def main():
     # CLASSES
     @dataclass
     class CAPEntry:
+        """Data class for holding essential values about an alert; most values inserted into SQL database"""
         cap_area_desc: str = np.NaN
         cap_certainty: str = np.NaN
         cap_effective: str = np.NaN
