@@ -32,7 +32,7 @@ def main():
     sql_delete_insert_template = """DELETE FROM {table}; INSERT INTO {table} ({headers_joined}) VALUES """
     sql_values_statement = """({values})"""
     sql_values_statements_list = []
-    sql_values_string_template = """'"""
+    sql_values_string_template = """'{id}', '{start_time}', '{closed_time}', {length}, '{description}', '{city}', '{zip_code}', {state_id}, '{county_id}', {geometry}, '{data_gen}'"""
     task_name = "RITISBottlenecks"  # TODO: Check
 
     TESTING = False  # OPTION
@@ -108,17 +108,17 @@ def main():
         """
         Data class for holding essential values about a RITIS Bottleneck Feature; most values inserted into SQL database
         """
-        city: str
-        closed_time: str
-        county_id: str
-        data_gen: str
-        description: str
-        geometry: str
-        id: str
-        length: str
-        start_time: str
-        zip_code: str
-        state_id: str  # MD Fips always 24. This process filters for MD only; Is constant but didn't make default here.
+        city: str = np.NaN
+        closed_time: str = np.NaN
+        county_id: str = np.NaN
+        data_gen: str = np.NaN
+        description: str = np.NaN
+        geometry: str = np.NaN
+        id: str = np.NaN
+        length: float = np.NaN
+        start_time: str = np.NaN
+        state_id: int = np.NaN  # MD Fips always 24. This process filters for MD only; Is constant but didn't make default here.
+        zip_code: str = np.NaN
 
     # FUNCTIONALITY
     start = datetime.now()
@@ -177,7 +177,7 @@ def main():
             geometry_type = geometry.get("type", None)
             geometry_string = create_geometry_string_value(coordinate_pairs_list=coordinates, geom_type=geometry_type)
             properties_dict = feature.get("properties", None)[0]  # List of length 1 at time of design
-            length = properties_dict.get("length", None)
+            length = float(properties_dict.get("length", None))
             start_time = properties_dict.get("startTimestamp", None)
             start_time_parsed = process_date_time_strings(value=start_time)
             closed_time = properties_dict.get("closedTimestamp", None)
@@ -187,7 +187,7 @@ def main():
             description_cleaned = clean_string_of_apostrophes_for_sql(value=description)  # see function for note
             city = location_dict.get("city", None)
             zip_code = location_dict.get("zipcode", None)
-            # state_id = location_dict.get("state", None)[0].get("fips", None)  # MD fips is always 24
+            # state_id = int(location_dict.get("state", None)[0].get("fips", None))  # MD fips is always 24
             county_dict = location_dict.get("county", None)[0]  # List of length 1 at time of design
             county_id = county_dict.get("fips", None)
         except AttributeError as ae:
@@ -198,17 +198,9 @@ def main():
             """
             print(f"Error in attribute extraction from json. One of the expected values was not found. {ae}")
             str_None = str(None)
-            feature_objects_list.append(Feature(city=str_None,
-                                                closed_time=str_None,
-                                                county_id=str_None,
-                                                data_gen=str_None,
-                                                description=str_None,
-                                                geometry=str_None,
+            feature_objects_list.append(Feature(data_gen=str_None,
                                                 id=id,
-                                                length=str_None,
-                                                start_time=str_None,
-                                                state_id='24',  # Note, is a default value. MD fips is always 24.
-                                                zip_code=str_None
+                                                state_id=24,  # Note, is a default value. MD fips is always 24.
                                                 )
                                         )
         else:
@@ -221,13 +213,28 @@ def main():
                                                 id=id,
                                                 length=length,
                                                 start_time=start_time_parsed,
-                                                state_id='24',  # Note, is a default value. MD fips is always 24.
+                                                state_id=24,  # Note, is a default value. MD fips is always 24.
                                                 zip_code=zip_code
                                                 )
                                         )
-    # for obj in feature_objects_list:
-    #     print(obj)
 
+    # Need to build the values string statements for use later on with sql insert statement.
+    for feature_obj in feature_objects_list:
+        values = sql_values_string_template.format(id=feature_obj.id,
+                                                   start_time=feature_obj.start_time,
+                                                   closed_time=feature_obj.closed_time,
+                                                   length=feature_obj.length,
+                                                   description=feature_obj.description,
+                                                   city=feature_obj.city,
+                                                   zip_code=feature_obj.zip_code,
+                                                   state_id=feature_obj.state_id,
+                                                   county_id=feature_obj.county_id,
+                                                   geometry=feature_obj.geometry,
+                                                   data_gen=feature_obj.data_gen)
+        values_string = sql_values_statement.format(values=values)
+        sql_values_statements_list.append(values_string)
+
+        
     return
 
 
