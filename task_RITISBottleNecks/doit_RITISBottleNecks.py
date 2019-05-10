@@ -4,8 +4,9 @@
 
 
 def main():
+
     # IMPORTS
-    # IMPORTS
+    from ast import literal_eval
     from dataclasses import dataclass
     from datetime import datetime
     import configparser
@@ -24,15 +25,15 @@ def main():
     current_year = datetime.now().year
     database_connection_string = "DSN={database_name};UID={database_user};PWD={database_password}"
     mema_cfg_section_name = "MEMA_VALUES"
-
-
     realtime_webeocshelters_tbl = "[{database_name}].[dbo].[RealTime_RITISBottlenecks]"  # TODO: Check
-    shelter_objects_list = []
+    feature_objects_list = []
     sql_delete_insert_template = """DELETE FROM {table}; INSERT INTO {table} ({headers_joined}) VALUES """
     sql_values_statement = """({values})"""
     sql_values_statements_list = []
     sql_values_string_template = """'"""
     task_name = "RITISBottlenecks"  # TODO: Check
+
+    TESTING = True  # OPTION
 
     print(f"Variables completed.")
 
@@ -47,6 +48,10 @@ def main():
         :return: string date & time
         """
         return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+    def create_geometry_string_value(coordinate_pairs_list: list, geom_type: str) -> str:
+        number_values = ", ".join([f"{lat} {lon}" for lat, lon in coordinate_pairs_list])
+        return f"geometry::STGeomFromText('{geom_type.upper()}({number_values})', 4326)"
 
     def determine_database_config_value_based_on_script_name() -> str:
         """
@@ -81,8 +86,23 @@ def main():
         """
         return datetime.now() - start
 
-
     # CLASSES
+    @dataclass
+    class Feature:
+        """
+        Data class for holding essential values about a RITIS Bottleneck Feature; most values inserted into SQL database
+        """
+        city: str
+        closed_time: str
+        county_id: str
+        data_gen: str
+        description: str
+        geometry: str
+        id: str
+        length: str
+        start_time: str
+        zip_code: str
+        state_id: str = "24"  # MD Fips always 24. This process filters for MD only; So constant unless redesigned
 
     # FUNCTIONALITY
     start = datetime.now()
@@ -102,17 +122,59 @@ def main():
     mema_request_url = config_parser[mema_cfg_section_name]["URL"]
     mema_data = config_parser[mema_cfg_section_name]["DATA"]
 
+
+
     # need to make requests to mema url to get json for interrogation and data extraction
     try:
-        response = requests.post(url=mema_request_url, data=mema_data, headers=mema_request_header)
+        if not TESTING:
+            response = requests.post(url=mema_request_url, data=mema_data, headers=mema_request_header)
+            print(response.status_code)
     except Exception as e:
         print(f"Exception during request for page {mema_request_url}. {e}")
         print(f"Response status code: {response.status_code}")
         print(f"Time elapsed {time_elapsed(start=start)}")
         exit()
     else:
-        response_json = response.json()
-        print(response_json)
+        if TESTING:
+            with open(r"Docs/ExampleJSONresponse.json", 'r') as handler:
+                response_json = json.load(handler)
+        else:
+            response_json = response.json()
+
+        features = response_json.get("features")
+        for feature in features:
+            id = feature.get("id", None)
+            geometry = feature.get("geometry", None)
+            coordinates = geometry.get("coordinates", None)
+            geometry_type = geometry.get("type", None)
+            geometry_string = create_geometry_string_value(coordinate_pairs_list=coordinates, geom_type=geometry_type)
+            properties_dict = feature.get("properties", None)[0]  # List of length 1 at time of design
+            length = properties_dict.get("length", None)
+            location_dict = properties_dict.get("location", None)
+            city = location_dict.get("city", None)
+            zip_code = location_dict.get("zipcode", None)
+            # state_id = location_dict.get("state", None)[0].get("fips", None)  # MD fips is always 24
+            county_dict = location_dict.get("county", None)[0]  # List of length 1 at time of design
+            county_id = county_dict.get("fips", None)
+
+            continue
+            # feature_objects_list.append(Feature(city=,
+            #                                     closed_time=,
+            #                                     county_id=,
+            #                                     data_gen=,
+            #                                     description=,
+            #                                     geometry=,
+            #                                     id=,
+            #                                     length=,
+            #                                     start_time=,
+            #                                     state_id=,
+            #                                     zip_code=
+            #                                     )
+            #                             )
+    # coordinates = features.get()
+
+
+
     
 
     return
