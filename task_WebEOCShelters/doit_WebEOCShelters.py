@@ -62,10 +62,7 @@ def main():
         :param val:
         :return:
         """
-        if val == "":
-            return str(np.NaN)
-        else:
-            return val
+        return str(np.NaN) if val == "" else val
 
     def clean_record_string_values_for_database(value_dict: dict) -> dict:
         """
@@ -128,20 +125,6 @@ def main():
             exit()
         else:
             return result
-        # else:
-        #     if len(result) == 0:
-        #         # NOTE: The 'r' in front of the url is essential for this to work.
-        #         altered_tag_name = appended_unnecessary_url + tag_name
-        #         # print(f"Altering...{altered_tag_name}")
-        #         return element.findall(altered_tag_name)
-        #     else:
-        #         return result
-
-        # try:
-        #     return element.findall(tag_name)
-        # except AttributeError as ae:
-        #     print(f"AttributeError: Unable to extract '{tag_name}' from {element.text}: {ae}")
-        #     exit()
 
     def extract_first_immediate_child_feature_from_element(element: ET.Element, tag_name: str) -> ET.Element:
         """Extract first immediate child feature from provided xml ET.Element based on provided tag name
@@ -215,10 +198,7 @@ def main():
         :param remove_value: string value extracted from xml
         :return: integer for true (1), false (0)
         """
-        if remove_value.lower() == "yes":
-            return 1
-        else:
-            return 0
+        return 1 if remove_value.lower() == "yes" else 0
 
     def process_user_name(value: str) -> str:
         """
@@ -226,10 +206,7 @@ def main():
         :param value: extracted value
         :return: string substitute or original value
         """
-        if value == "":
-            return "User Account No Longer Exists"
-        else:
-            return value
+        return "User Account No Longer Exists" if value == "" else value
 
     def replace_problematic_chars_w_underscore(string: str) -> str:
         """
