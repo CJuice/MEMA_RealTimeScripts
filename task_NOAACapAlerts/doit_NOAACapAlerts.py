@@ -146,20 +146,6 @@ def main():
             exit()
         else:
             return result
-        # else:
-        #     if len(result) == 0:
-        #         # NOTE: The 'r' in front of the url is essential for this to work.
-        #         altered_tag_name = appended_unnecessary_url + tag_name
-        #         # print(f"Altering...{altered_tag_name}")
-        #         return element.findall(altered_tag_name)
-        #     else:
-        #         return result
-
-        # try:
-        #     return element.findall(tag_name)
-        # except AttributeError as ae:
-        #     print(f"AttributeError: Unable to extract '{tag_name}' from {element.text}: {ae}")
-        #     exit()
 
     def extract_first_immediate_child_feature_from_element(element: ET.Element, tag_name: str) -> ET.Element:
         """Extract first immediate child feature from provided xml ET.Element based on provided tag name
