@@ -215,6 +215,7 @@ def main():
             location_dict = properties_dict.get("location", None)
             description = location_dict.get("description", None)
             description_cleaned = clean_string_of_apostrophes_for_sql(value=description)  # see function for note
+            description_cleaned = description_cleaned[:50]  # FIXME: Due to database size limitation, have to cut this. To amend database requires more permission than I have so this is temp fix until DBA does so. Values were exceeding len = 50.
             city = location_dict.get("city", None)
             zip_code = location_dict.get("zipcode", None)
             # state_id = int(location_dict.get("state", None)[0].get("fips", None))  # MD fips is always 24
@@ -308,6 +309,7 @@ def main():
                 cursor.execute(batch)
             except pyodbc.DataError:
                 print(f"A value in the sql exceeds the field length allowed in database table: {batch}")
+                # print(f"A value in the sql exceeds the field length allowed in database table")
             else:
                 print(f"Executing insert batch {insert_round_count}. Time elapsed {time_elapsed(start=start)}")
                 insert_round_count += 1
