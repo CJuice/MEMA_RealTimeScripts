@@ -73,6 +73,15 @@ def main():
         cfg_parser.read(filenames=cfg_file)
         return cfg_parser
 
+    def time_elapsed(start=datetime.now()):
+        """
+        Calculate the difference between datetime.now() value and a start datetime value
+        :param start: datetime value
+        :return: datetime value
+        """
+        return datetime.now() - start
+
+
     # CLASSES
 
     # FUNCTIONALITY
@@ -87,6 +96,24 @@ def main():
 
     # need parser to access credentials
     config_parser = setup_config(config_file_path)
+
+    # need mema specific values for post requests
+    mema_request_header = json.loads(config_parser[mema_cfg_section_name]["HEADER"])
+    mema_request_url = config_parser[mema_cfg_section_name]["URL"]
+    mema_data = config_parser[mema_cfg_section_name]["DATA"]
+
+    # need to make requests to mema url to get json for interrogation and data extraction
+    try:
+        response = requests.post(url=mema_request_url, data=mema_data, headers=mema_request_header)
+    except Exception as e:
+        print(f"Exception during request for page {mema_request_url}. {e}")
+        print(f"Response status code: {response.status_code}")
+        print(f"Time elapsed {time_elapsed(start=start)}")
+        exit()
+    else:
+        response_json = response.json()
+        print(response_json)
+    
 
     return
 
