@@ -1,5 +1,16 @@
 """
-TODO: Documentation
+This is a procedural script for populating MEMA database with RITIS Feature data.
+
+This process makes a post request to a RITIS url for data on features. It isolates data to Maryland only.
+The response is in json format. The json is interrogated for values of interest to MEMA. The values of interest are
+start time, closed time, length, description, city, zip code, state id (always 24 for MD), county id, the
+geometry, and the date the data was generated. These extracted values are encapsulated in a "Feature" dataclass
+object that is stored in a list. The list of Feature objects are accessed and used to generate the values in the
+insert sql statement. Once the insert statement is completed a database connection is established, all existing
+records are deleted, and the new records are inserted.
+Redesigned from the original CGIS version when MEMA server environments were being migrated to new versions.
+Author: CJuice, 20190513
+Revisions:
 """
 
 
