@@ -84,6 +84,13 @@ def main():
         return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     def create_geometry_string_value(coordinate_pairs_list: list, geom_type: str) -> str:
+        """
+        Create a string in the format necessary for insertion of geometry into a sql database table.
+
+        :param coordinate_pairs_list: list of coordinate pairs for the feature of interest
+        :param geom_type: type value provided with the coordinate values in the RITIS response
+        :return: string value for use in sql insert statement
+        """
         number_values = ", ".join([f"{lat} {lon}" for lat, lon in coordinate_pairs_list])
         return f"geometry::STGeomFromText('{geom_type.upper()}({number_values})', 4326)"
 
@@ -102,8 +109,14 @@ def main():
         else:
             return "DATABASE_DEV"
 
-    def process_date_time_strings(value):
-        return date_parser.parse(value).strftime(date_time_format)
+    def process_date_time_strings(value, format_template):
+        """
+        Parse the date string using DateUtil parser and return string
+        :param value: date time string value needing parsing
+        :param format_template: template for formatting string output of parsed date time
+        :return: string of parsed date time
+        """
+        return date_parser.parse(value).strftime(format_template)
 
     def setup_config(cfg_file: str) -> configparser.ConfigParser:
         """
@@ -196,7 +209,7 @@ def main():
     try:
         header_dict = response_json.get("header", np.NaN)
         data_gen = header_dict.get("timestamp", np.NaN)
-        data_gen_parsed = process_date_time_strings(value=data_gen)
+        data_gen_parsed = process_date_time_strings(value=data_gen, format_template=date_time_format)
     except AttributeError as ae:
         print(f"Error extracting header, data generated date, or time value. \n{ae}"
               f"\nMay be issue with response json: \n{response_json}")
@@ -222,9 +235,9 @@ def main():
             properties_dict = feature.get("properties", np.NaN)[0]  # List of length 1 at time of design
             length = float(properties_dict.get("length", np.NaN))
             start_time = properties_dict.get("startTimestamp", np.NaN)
-            start_time_parsed = process_date_time_strings(value=start_time)
+            start_time_parsed = process_date_time_strings(value=start_time, format_template=date_time_format)
             closed_time = properties_dict.get("closedTimestamp", np.NaN)
-            closed_time_parsed = process_date_time_strings(value=closed_time)
+            closed_time_parsed = process_date_time_strings(value=closed_time, format_template=date_time_format)
             location_dict = properties_dict.get("location", np.NaN)
             description = location_dict.get("description", np.NaN)
             description_cleaned = clean_string_of_apostrophes_for_sql(value=description)  # see function for note
