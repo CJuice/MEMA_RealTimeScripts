@@ -6,7 +6,6 @@ TODO: Documentation
 def main():
 
     # IMPORTS
-    from ast import literal_eval
     from dataclasses import dataclass
     from datetime import datetime
     from dateutil import parser as date_parser
@@ -15,15 +14,15 @@ def main():
     import numpy as np
     import os
     import pyodbc
-    import re
     import requests
-    import xml.etree.ElementTree as ET
 
     # VARIABLES
+    TESTING = False  # OPTION
+
     _root_file_path = os.path.dirname(__file__)
+
     config_file = r"doit_config_RITISBottlenecks.cfg"
     config_file_path = os.path.join(_root_file_path, config_file)
-    # current_year = datetime.now().year
     database_connection_string = "DSN={database_name};UID={database_user};PWD={database_password}"
     date_time_format = "%Y-%m-%d %H:%M:%S"
     mema_cfg_section_name = "MEMA_VALUES"
@@ -31,7 +30,6 @@ def main():
     feature_objects_list = []
     ritis_bottlenecks_headers = ("ID", "starttime", "closedtime", "length", "description", "city", "zipcode",
                                  "stateID", "countyID", "geometry", "DataGenerated")
-    # sql_delete_insert_template = """DELETE FROM {table}; INSERT INTO {table} ({headers_joined}) VALUES """
     sql_delete_template = """DELETE FROM {table};"""
     sql_insert_template = """INSERT INTO {table} ({headers_joined}) VALUES """
     sql_insertion_step_increment = 1000
@@ -39,8 +37,6 @@ def main():
     sql_values_statements_list = []
     sql_values_string_template = """'{id}', '{start_time}', '{closed_time}', {length}, '{description}', '{city}', '{zip_code}', {state_id}, '{county_id}', {geometry}, '{data_gen}'"""
     task_name = "RITISBottleNecks"
-
-    TESTING = False  # OPTION
 
     print(f"Variables completed.")
 
@@ -147,7 +143,7 @@ def main():
         id: str = np.NaN
         length: float = np.NaN
         start_time: str = np.NaN
-        state_id: int = np.NaN  # MD Fips always 24. This process filters for MD only; Is constant but didn't make default here.
+        state_id: int = 24  # MD Fips always 24. This process filters for MD only; Is constant
         zip_code: str = np.NaN
 
     # FUNCTIONALITY
@@ -163,64 +159,70 @@ def main():
     # need parser to access credentials
     config_parser = setup_config(config_file_path)
 
-    # need mema specific values for post requests
+    # need mema specific values for post request
     mema_request_header = json.loads(config_parser[mema_cfg_section_name]["HEADER"])
     mema_request_url = config_parser[mema_cfg_section_name]["URL"]
     mema_data = config_parser[mema_cfg_section_name]["DATA"]
 
-    # need to make requests to mema url to get json for interrogation and data extraction
+    # need to make requests to mema url to get response (json) for interrogation and data extraction
     try:
         if not TESTING:
             response = requests.post(url=mema_request_url, data=mema_data, headers=mema_request_header)
-            # print(response.status_code)
     except Exception as e:
         print(f"Exception during request for page {mema_request_url}. {e}")
         print(f"Response status code: {response.status_code}")
         print(f"Time elapsed {time_elapsed(start=start)}")
         exit()
     else:
+
+        # During testing, the script can use a local json file instead of making requests.
+        #   Was mandatory during development because RITIS was have server issues.
         if TESTING:
             with open(r"Docs/ExampleJSONresponse.json", 'r') as handler:
                 response_json = json.load(handler)
         else:
             response_json = response.json()
     try:
-        header_dict = response_json.get("header", None)
-        data_gen = header_dict.get("timestamp", None)
+        header_dict = response_json.get("header", np.NaN)
+        data_gen = header_dict.get("timestamp", np.NaN)
         data_gen_parsed = process_date_time_strings(value=data_gen)
     except AttributeError as ae:
-        print(f"Error extracting data generated date and time value. \n{ae}\nMay be issue with response json: \n{response_json}")
+        print(f"Error extracting header, data generated date, or time value. \n{ae}"
+              f"\nMay be issue with response json: \n{response_json}")
         exit()
 
-    features = response_json.get("features", None)
+    # Need to extract the RITIS features from the json and process data on each feature
+    features = response_json.get("features", np.NaN)
     for feature in features:
         try:
-            id = feature.get("id", None)
+            id = feature.get("id", np.NaN)
         except AttributeError as ae:
 
-            # If process can't get an id value then can't create unique feature object so continue on
+            # If process can't get an id value then can't create unique feature object so continue on to next feature
             print(f"Error extracting feature id. Feature skipped {ae}\n\t{feature}")
             continue
         try:
-            geometry = feature.get("geometry", None)
-            coordinates = geometry.get("coordinates", None)
-            geometry_type = geometry.get("type", None)
+
+            # Need to get all the values of interest. If fails, the default object values can be used.
+            geometry = feature.get("geometry", np.NaN)
+            coordinates = geometry.get("coordinates", np.NaN)
+            geometry_type = geometry.get("type", np.NaN)
             geometry_string = create_geometry_string_value(coordinate_pairs_list=coordinates, geom_type=geometry_type)
-            properties_dict = feature.get("properties", None)[0]  # List of length 1 at time of design
-            length = float(properties_dict.get("length", None))
-            start_time = properties_dict.get("startTimestamp", None)
+            properties_dict = feature.get("properties", np.NaN)[0]  # List of length 1 at time of design
+            length = float(properties_dict.get("length", np.NaN))
+            start_time = properties_dict.get("startTimestamp", np.NaN)
             start_time_parsed = process_date_time_strings(value=start_time)
-            closed_time = properties_dict.get("closedTimestamp", None)
+            closed_time = properties_dict.get("closedTimestamp", np.NaN)
             closed_time_parsed = process_date_time_strings(value=closed_time)
-            location_dict = properties_dict.get("location", None)
-            description = location_dict.get("description", None)
+            location_dict = properties_dict.get("location", np.NaN)
+            description = location_dict.get("description", np.NaN)
             description_cleaned = clean_string_of_apostrophes_for_sql(value=description)  # see function for note
-            description_cleaned = description_cleaned[:50]  # FIXME: Due to database size limitation, have to cut this. To amend database requires more permission than I have so this is temp fix until DBA does so. Values were exceeding len = 50.
-            city = location_dict.get("city", None)
-            zip_code = location_dict.get("zipcode", None)
-            # state_id = int(location_dict.get("state", None)[0].get("fips", None))  # MD fips is always 24
-            county_dict = location_dict.get("county", None)[0]  # List of length 1 at time of design
-            county_id = county_dict.get("fips", None)
+            description_cleaned = description_cleaned[:50]  # FIXME: Due to database size limitation, have to slice this. To amend database requires more permission than I have so this is temp fix until DBA does so. Values were exceeding len == 50.
+            city = location_dict.get("city", np.NaN)
+            zip_code = location_dict.get("zipcode", np.NaN)
+            # state_id = int(location_dict.get("state", np.NaN)[0].get("fips", np.NaN))  # MD fips is always 24
+            county_dict = location_dict.get("county", np.NaN)[0]  # List of length 1 at time of design
+            county_id = county_dict.get("fips", np.NaN)
         except AttributeError as ae:
 
             """Protecting against an issue in all the extractison above. If can get an id, then proceed and try others.
@@ -228,12 +230,8 @@ def main():
                 the feature(s) with issues in their json objects.
             """
             print(f"Error in attribute extraction from json. One of the expected values was not found. {ae}")
-            str_None = str(None)
-            feature_objects_list.append(Feature(data_gen=str_None,
-                                                id=id,
-                                                state_id=24,  # Note, is a default value. MD fips is always 24.
-                                                )
-                                        )
+            feature_objects_list.append(Feature(id=id))
+            continue
         else:
             feature_objects_list.append(Feature(city=city,
                                                 closed_time=closed_time_parsed,
@@ -244,7 +242,7 @@ def main():
                                                 id=id,
                                                 length=length,
                                                 start_time=start_time_parsed,
-                                                state_id=24,  # Note, is a default value. MD fips is always 24.
+                                                # state_id=24,  # Note, is a default value. MD fips is always 24.
                                                 zip_code=zip_code
                                                 )
                                         )
@@ -293,7 +291,7 @@ def main():
     with pyodbc.connect(full_connection_string) as connection:
         cursor = connection.cursor()
 
-        # Due to 1000 record insert limit, delete records first and then do insertion rounds for 2400+ gauges
+        # Due to 1000 record insert limit, delete records first and then do insertion rounds. Unsure of feature counts
         try:
             cursor.execute(sql_delete_string)
         except Exception as e:
