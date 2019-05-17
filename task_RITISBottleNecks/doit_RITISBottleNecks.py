@@ -205,7 +205,12 @@ def main():
             with open(r"Docs/ExampleJSONresponse.json", 'r') as handler:
                 response_json = json.load(handler)
         else:
-            response_json = response.json()
+            try:
+                response_json = response.json()
+            except json.decoder.JSONDecodeError as jde:
+                print(f"Response to json raised JSONDecoderError: {jde}\nResponse: {response}\nExiting process...")
+                exit()
+
     try:
         header_dict = response_json.get("header", np.NaN)
         data_gen = header_dict.get("timestamp", np.NaN)
