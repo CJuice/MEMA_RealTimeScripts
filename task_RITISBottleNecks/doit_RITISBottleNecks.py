@@ -10,7 +10,9 @@ insert sql statement. Once the insert statement is completed a database connecti
 records are deleted, and the new records are inserted.
 Redesigned from the original CGIS version when MEMA server environments were being migrated to new versions.
 Author: CJuice, 20190513
-Revisions:
+Revisions: 20190517, Added error handling for json.decoder.JSONDecoderError occurring and unhandled when the
+    Response came back as None. The call to the requests modules .json() method on the response raised an exception
+    when the response was None and couldn't be decoded. Added try/except to catch and exit with meaningful message.
 """
 
 
